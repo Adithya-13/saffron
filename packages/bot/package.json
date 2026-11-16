@@ -1,0 +1,21 @@
+{
+  "name": "@saffron/bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "sim": "node src/report.ts"
+  },
+  "dependencies": {
+    "@saffron/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "@saffron/content": "workspace:*",
+    "@types/node": "24.19.2",
+    "fast-check": "4.10.2"
+  }
+}
