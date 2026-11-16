@@ -61,8 +61,10 @@ const tokenFlights = (
 
 const countTokens = (tokens: TokenCounts): number => TOKENS.reduce((s, t) => s + tokens[t], 0);
 
-const clinks = (count: number, start: number, volume = 0.8): SoundCue[] =>
-  Array.from({ length: Math.min(count, 6) }, (_, i) => ({
+const MAX_CLINKS = 2;
+
+const clinks = (count: number, start: number, volume = 0.45): SoundCue[] =>
+  Array.from({ length: Math.min(count, MAX_CLINKS) }, (_, i) => ({
     name: (['clink1', 'clink2', 'clink3'] as const)[i % 3] ?? 'clink1',
     delay: start + TOKEN_FLIGHT - 60 + i * TOKEN_GAP,
     volume,
@@ -93,7 +95,7 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
           (t) => [anchors.supply(t)],
           at,
         ),
-        sounds: clinks(countTokens(event.tokens), at, 0.5),
+        sounds: clinks(countTokens(event.tokens), at, 0.3),
       };
     }
     case 'cardBought': {
@@ -120,9 +122,8 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
           ...paid,
         ],
         sounds: [
-          { name: 'slide', delay: at, volume: 0.5 },
-          { name: 'chime', delay: at + CARD_FLIGHT - 120 },
-          ...clinks(countTokens(event.paid), at + 200, 0.6),
+          { name: 'slide', delay: at, volume: 0.35 },
+          ...clinks(Math.min(countTokens(event.paid), 1), at + 200, 0.3),
         ],
       };
     }
@@ -158,9 +159,9 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
           ...seal,
         ],
         sounds: [
-          { name: 'slide', delay: at, volume: 0.5 },
+          { name: 'slide', delay: at, volume: 0.35 },
           ...(event.sealTaken
-            ? [{ name: 'stamp' as const, delay: at + 260 + TOKEN_FLIGHT - 80 }]
+            ? [{ name: 'stamp' as const, delay: at + 260 + TOKEN_FLIGHT - 80, volume: 0.4 }]
             : []),
         ],
       };
@@ -177,30 +178,30 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
           },
         ],
         sounds: [
-          { name: 'stamp', delay: at + GUILD_FLIGHT - 120, volume: 0.6 },
-          { name: 'chime', delay: at + GUILD_FLIGHT, volume: 0.6 },
+          { name: 'stamp', delay: at + GUILD_FLIGHT - 120, volume: 0.4 },
+          { name: 'chime', delay: at + GUILD_FLIGHT, volume: 0.45 },
         ],
       };
     case 'marketRefilled':
       return event.card
-        ? { flights: [], sounds: [{ name: 'flip', delay: at + 380, volume: 0.6 }] }
+        ? { flights: [], sounds: [{ name: 'flip', delay: at + 380, volume: 0.3 }] }
         : { flights: [], sounds: [] };
     case 'turnStarted':
       return event.playerId === viewerId
         ? {
             flights: [],
-            sounds: [{ name: 'bell', delay: at + 150, volume: 0.6 }],
+            sounds: [{ name: 'bell', delay: at + 150, volume: 0.45 }],
             banner: { text: 'Your turn', tone: 'turn' },
           }
         : { flights: [], sounds: [] };
     case 'finalRound':
       return {
         flights: [],
-        sounds: [{ name: 'bell', delay: at, volume: 0.7 }],
+        sounds: [{ name: 'bell', delay: at, volume: 0.5 }],
         banner: { text: 'Final round', tone: 'final' },
       };
     case 'passed':
-      return { flights: [], sounds: [{ name: 'thunk', delay: at, volume: 0.5 }] };
+      return { flights: [], sounds: [{ name: 'thunk', delay: at, volume: 0.3 }] };
     case 'gameEnded':
       return { flights: [], sounds: [] };
   }

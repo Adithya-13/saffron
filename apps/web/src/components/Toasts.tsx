@@ -11,7 +11,7 @@ export const Toasts = () => {
 
   useEffect(() => {
     if (!toast) return;
-    if (toast.tone === 'error') play('thunk', { volume: 0.6 });
+    if (toast.tone === 'error') play('thunk', { volume: 0.3 });
     const timer = setTimeout(() => clearToast(toast.id), TOAST_MS);
     return () => clearTimeout(timer);
   }, [toast, clearToast]);

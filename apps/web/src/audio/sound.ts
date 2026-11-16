@@ -37,9 +37,9 @@ const prefersQuiet = (): boolean =>
 
 export const useAudioSettings = create<AudioSettings>()(() => ({
   muted: loadSetting('muted') === 'true',
-  sfxVolume: readNumber('sfxVolume', 0.8),
-  musicVolume: readNumber('musicVolume', prefersQuiet() ? 0 : 0.35),
-  ambienceVolume: readNumber('ambienceVolume', prefersQuiet() ? 0 : 0.25),
+  sfxVolume: readNumber('sfxVolume', 0.5),
+  musicVolume: readNumber('musicVolume', prefersQuiet() ? 0 : 0.25),
+  ambienceVolume: readNumber('ambienceVolume', prefersQuiet() ? 0 : 0.18),
 }));
 
 const sources = (name: string): string[] => [
@@ -107,7 +107,7 @@ export const play = (name: SfxName, options: { delay?: number; volume?: number }
     const howl = sfx(name);
     const id = howl.play();
     howl.volume(s.sfxVolume * (options.volume ?? 1), id);
-    howl.rate(0.95 + Math.random() * 0.1, id);
+    howl.rate(0.98 + Math.random() * 0.04, id);
   };
   if (options.delay) setTimeout(fire, options.delay);
   else fire();
@@ -116,8 +116,8 @@ export const play = (name: SfxName, options: { delay?: number; volume?: number }
 const CLINKS: readonly SfxName[] = ['clink1', 'clink2', 'clink3'];
 
 export const playClinks = (count: number, startDelay = 0, gap = 70): void => {
-  for (let i = 0; i < Math.min(count, 6); i++) {
-    play(CLINKS[i % CLINKS.length] ?? 'clink1', { delay: startDelay + i * gap, volume: 0.8 });
+  for (let i = 0; i < Math.min(count, 2); i++) {
+    play(CLINKS[i % CLINKS.length] ?? 'clink1', { delay: startDelay + i * gap, volume: 0.45 });
   }
 };
 

@@ -26,7 +26,7 @@ encode_audio() {
   local input="$1" name="$2" loudness="$3" trim="$4"
   local filters="loudnorm=I=${loudness}:TP=-1.5:LRA=11"
   if [[ "$trim" == "trim" ]]; then
-    filters="silenceremove=start_periods=1:start_threshold=-50dB,${filters}"
+    filters="silenceremove=start_periods=1:start_threshold=-50dB,lowpass=f=4200,afade=t=in:d=0.012,${filters}"
   fi
   ffmpeg -loglevel error -y -i "$input" -af "$filters" -ar 48000 -c:a libopus -b:a 96k "$OUT/audio/${name}.webm"
   ffmpeg -loglevel error -y -i "$input" -af "$filters" -ar 44100 -c:a aac -b:a 128k "$OUT/audio/${name}.m4a"
@@ -35,9 +35,9 @@ encode_audio() {
 for file in "$SRC"/audio/*.mp3; do
   name="$(basename "${file%.mp3}")"
   case "$name" in
-    music) encode_audio "$file" "$name" -20 keep ;;
-    ambience) encode_audio "$file" "$name" -26 keep ;;
-    *) encode_audio "$file" "$name" -16 trim ;;
+    music) encode_audio "$file" "$name" -24 keep ;;
+    ambience) encode_audio "$file" "$name" -28 keep ;;
+    *) encode_audio "$file" "$name" -20 trim ;;
   esac
 done
 
