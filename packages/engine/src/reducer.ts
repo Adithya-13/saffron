@@ -9,14 +9,7 @@ import {
   totalTokens,
 } from './counts.ts';
 import { hasActionAvailable } from './legal.ts';
-import {
-  SPICES,
-  TOKENS,
-  DOUBLE_TAKE_MIN_PILE,
-  MAX_RESERVED,
-  MAX_TOKENS,
-  TARGET_POINTS,
-} from './types.ts';
+import { SPICES, TOKENS, DOUBLE_TAKE_MIN_PILE, MAX_RESERVED, MAX_TOKENS } from './types.ts';
 import type {
   BuySource,
   Card,
@@ -77,7 +70,7 @@ const winnersOf = (players: readonly PlayerState[]): readonly string[] => {
 
 const endTurn = ({ state, events }: Step): Step => {
   const player = currentOf(state);
-  const triggers = !state.finalRound && pointsOf(player) >= TARGET_POINTS;
+  const triggers = !state.finalRound && pointsOf(player) >= state.targetPoints;
   const finalRound = state.finalRound || triggers;
   const triggerEvents: GameEvent[] = triggers
     ? [{ type: 'finalRound', triggeredBy: player.id }]

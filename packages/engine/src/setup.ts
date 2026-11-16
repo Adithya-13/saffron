@@ -1,7 +1,7 @@
 import { emptyTokens } from './counts.ts';
 import { seedRng, shuffle } from './rng.ts';
 import type { RngState } from './rng.ts';
-import { MARKET_SLOTS, SEAL_SUPPLY, SPICES, TIERS } from './types.ts';
+import { MARKET_SLOTS, SPICES, TIERS } from './types.ts';
 import type {
   Card,
   Catalog,
@@ -13,21 +13,49 @@ import type {
 } from './types.ts';
 
 export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 4;
+export const MAX_PLAYERS = 8;
 
-const SPICE_SUPPLY_BY_PLAYERS: Readonly<Record<number, number>> = { 2: 4, 3: 5, 4: 7 };
+export type TableRules = {
+  readonly spicePerPile: number;
+  readonly seals: number;
+  readonly targetPoints: number;
+  readonly guilds: number;
+  readonly deckCopies: number;
+};
+
+const RULES_BY_PLAYERS: Readonly<Record<number, TableRules>> = {
+  2: { spicePerPile: 4, seals: 5, targetPoints: 15, guilds: 3, deckCopies: 1 },
+  3: { spicePerPile: 5, seals: 5, targetPoints: 15, guilds: 4, deckCopies: 1 },
+  4: { spicePerPile: 7, seals: 5, targetPoints: 15, guilds: 5, deckCopies: 1 },
+  5: { spicePerPile: 8, seals: 6, targetPoints: 13, guilds: 6, deckCopies: 2 },
+  6: { spicePerPile: 9, seals: 7, targetPoints: 13, guilds: 7, deckCopies: 2 },
+  7: { spicePerPile: 10, seals: 7, targetPoints: 12, guilds: 7, deckCopies: 2 },
+  8: { spicePerPile: 11, seals: 8, targetPoints: 12, guilds: 8, deckCopies: 2 },
+};
+
+export const rulesFor = (playerCount: number): TableRules => {
+  const rules = RULES_BY_PLAYERS[playerCount];
+  if (!rules) throw new Error(`Unsupported player count: ${playerCount}`);
+  return rules;
+};
 
 export const supplyFor = (playerCount: number): TokenCounts => {
-  const perSpice = SPICE_SUPPLY_BY_PLAYERS[playerCount];
-  if (perSpice === undefined) throw new Error(`Unsupported player count: ${playerCount}`);
+  const { spicePerPile, seals } = rulesFor(playerCount);
   return {
-    ...(Object.fromEntries(SPICES.map((s) => [s, perSpice])) as Record<
+    ...(Object.fromEntries(SPICES.map((s) => [s, spicePerPile])) as Record<
       (typeof SPICES)[number],
       number
     >),
-    seal: SEAL_SUPPLY,
+    seal: seals,
   };
 };
+
+const COPY_SUFFIXES = ['', '-b', '-c'] as const;
+
+export const printDeck = (cards: readonly Card[], copies: number): readonly Card[] =>
+  COPY_SUFFIXES.slice(0, copies).flatMap((suffix) =>
+    cards.map((card) => ({ ...card, id: `${card.id}${suffix}` })),
+  );
 
 const newPlayer = (id: string): PlayerState => ({
   id,
@@ -58,12 +86,14 @@ export const createGame = (
   }
   if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
 
+  const rules = rulesFor(playerIds.length);
+  const cards = printDeck(catalog.cards, rules.deckCopies);
   let rng = seedRng(seed);
   const decks: Partial<Record<Tier, readonly Card[]>> = {};
   const market: Partial<Record<Tier, MarketRow>> = {};
   for (const tier of TIERS) {
     const dealt = dealTier(
-      catalog.cards.filter((c) => c.tier === tier),
+      cards.filter((c) => c.tier === tier),
       rng,
     );
     decks[tier] = dealt.deck;
@@ -79,11 +109,12 @@ export const createGame = (
     decks: decks as Record<Tier, readonly Card[]>,
     market: market as Record<Tier, MarketRow>,
     supply: supplyFor(playerIds.length),
-    guilds: guildShuffle.items.slice(0, playerIds.length + 1),
+    guilds: guildShuffle.items.slice(0, rules.guilds),
     players: playerIds.map(newPlayer),
     currentPlayer: 0,
     phase: { kind: 'action' },
     turn: 1,
+    targetPoints: rules.targetPoints,
     finalRound: false,
     finished: false,
   };

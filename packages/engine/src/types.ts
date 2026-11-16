@@ -15,8 +15,6 @@ export type Tier = (typeof TIERS)[number];
 export const MARKET_SLOTS = 4;
 export const MAX_TOKENS = 10;
 export const MAX_RESERVED = 3;
-export const TARGET_POINTS = 15;
-export const SEAL_SUPPLY = 5;
 export const DOUBLE_TAKE_MIN_PILE = 4;
 
 export type Card = {
@@ -66,6 +64,7 @@ export type GameState = {
   readonly currentPlayer: number;
   readonly phase: Phase;
   readonly turn: number;
+  readonly targetPoints: number;
   readonly finalRound: boolean;
   readonly finished: boolean;
 };

@@ -38,6 +38,7 @@ export type PlayerView = {
   readonly currentPlayer: number;
   readonly phase: Phase;
   readonly turn: number;
+  readonly targetPoints: number;
   readonly finalRound: boolean;
   readonly finished: boolean;
 };
@@ -79,6 +80,7 @@ export const viewFor = (state: GameState, viewerId: string | null): PlayerView =
   currentPlayer: state.currentPlayer,
   phase: state.phase,
   turn: state.turn,
+  targetPoints: state.targetPoints,
   finalRound: state.finalRound,
   finished: state.finished,
 });

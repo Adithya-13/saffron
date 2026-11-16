@@ -64,9 +64,27 @@ describe('setup', () => {
     expect(state.guilds).toHaveLength(4);
   });
 
+  it('scales the table for eight players', () => {
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const state = createGame(catalog, ids, 1);
+    const dealt = TIERS.reduce((sum, t) => sum + state.decks[t].length + state.market[t].length, 0);
+    expect(dealt).toBe(catalog.cards.length * 2);
+    expect(new Set(TIERS.flatMap((t) => state.decks[t].map((c) => c.id))).size).toBe(
+      TIERS.reduce((sum, t) => sum + state.decks[t].length, 0),
+    );
+    expect(state.supply.saffron).toBe(11);
+    expect(state.supply.seal).toBe(8);
+    expect(state.targetPoints).toBe(12);
+  });
+
+  it('keeps classic targets up to four players', () => {
+    expect(start(4).targetPoints).toBe(15);
+  });
+
   it('rejects bad player counts', () => {
     expect(() => createGame(catalog, ['a'], 1)).toThrow();
     expect(() => createGame(catalog, ['a', 'a'], 1)).toThrow();
+    expect(() => createGame(catalog, 'abcdefghi'.split(''), 1)).toThrow();
   });
 });
 

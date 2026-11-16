@@ -7,6 +7,7 @@ import {
   TIERS,
   TOKENS,
   addTokens,
+  rulesFor,
   supplyFor,
   totalTokens,
 } from '@saffron/engine';
@@ -26,7 +27,7 @@ describe('random bot games', () => {
   it('preserve every invariant and always finish', () => {
     fc.assert(
       fc.property(
-        fc.integer({ min: 2, max: 4 }),
+        fc.integer({ min: 2, max: 8 }),
         fc.integer({ min: 1, max: 2 ** 31 }),
         (players, seed) => {
           const result = simulateGame(CATALOG, players, seed);
@@ -35,7 +36,7 @@ describe('random bot games', () => {
           const expectedSupply = supplyFor(players);
           for (const state of result.states) {
             expect(tokenTotals(state)).toEqual(expectedSupply);
-            expect(cardCount(state)).toBe(CATALOG.cards.length);
+            expect(cardCount(state)).toBe(CATALOG.cards.length * rulesFor(players).deckCopies);
             expect(TOKENS.every((t) => state.supply[t] >= 0)).toBe(true);
             for (const player of state.players) {
               expect(player.reserved.length).toBeLessThanOrEqual(MAX_RESERVED);
