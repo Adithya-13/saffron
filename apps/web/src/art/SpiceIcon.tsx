@@ -13,7 +13,7 @@ export const PALETTES: Readonly<Record<Token, Palette>> = {
   sumac: { base: '#9c3b32', ring: '#7a2c25', glyph: '#fbede8' },
   pepper: { base: '#3a3632', ring: '#1e1b16', glyph: '#ede7dc' },
   salt: { base: '#ece6da', ring: '#a79d8c', glyph: '#5b5347' },
-  seal: { base: '#8a6a2c', ring: '#6b5020', glyph: '#fbf3df' },
+  seal: { base: '#2f5d8c', ring: '#224569', glyph: '#eef3f8' },
 };
 
 const GLYPHS: Readonly<Record<Token, (color: string) => ReactElement>> = {

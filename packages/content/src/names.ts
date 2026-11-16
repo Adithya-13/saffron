@@ -10,7 +10,7 @@ export const SPICE_INFO: Readonly<
   sumac: { label: 'Sumac', color: '#b8324a' },
   pepper: { label: 'Pepper', color: '#3b3a40' },
   salt: { label: 'Salt', color: '#ece6da' },
-  seal: { label: 'Royal Seal', color: '#d4af37' },
+  seal: { label: 'Royal Seal', color: '#2f5d8c' },
 };
 
 export const TIER_INFO: Readonly<Record<Tier, { readonly label: string }>> = {
