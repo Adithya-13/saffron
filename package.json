@@ -10,7 +10,7 @@
     "dev": "pnpm --filter @saffron/web build && pnpm --filter @saffron/server dev",
     "dev:web": "pnpm --filter @saffron/web dev",
     "build": "pnpm --filter @saffron/web build",
-    "deploy": "pnpm build && pnpm --filter @saffron/server deploy",
+    "ship": "pnpm build && pnpm --filter @saffron/server run deploy",
     "assets": "./scripts/build-assets.sh",
     "sim": "pnpm --filter @saffron/bot sim",
     "test": "vitest run",

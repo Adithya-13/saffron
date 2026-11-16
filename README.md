@@ -27,7 +27,7 @@ pnpm test           # engine, content, bot and room logic tests
 pnpm e2e            # Playwright: two players, undo, chat, reconnect, full game vs bot
 pnpm sim 500        # bot-vs-bot balance report
 pnpm typecheck && pnpm lint
-pnpm deploy         # build web, deploy worker + assets to Cloudflare (needs `wrangler login`)
+pnpm ship           # build web, deploy worker + assets to Cloudflare (needs `wrangler login`)
 ```
 
 ## How a room works
