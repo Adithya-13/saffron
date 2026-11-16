@@ -1,5 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
-import { parseClientMessage } from '@saffron/protocol';
+import { parseClientMessage } from '@saffron/protocol/schema';
 import type { ServerMessage } from '@saffron/protocol';
 import {
   createRoom,

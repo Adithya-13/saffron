@@ -1,0 +1,78 @@
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useState } from 'react';
+import { send } from '../net/socket.ts';
+import { nameOf } from '../state/selectors.ts';
+import { useStore } from '../state/store.ts';
+
+const useSecondsLeft = (expiresAt: number | null): number => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (expiresAt === null) return;
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [expiresAt]);
+  return expiresAt === null ? 0 : Math.max(Math.ceil((expiresAt - now) / 1000), 0);
+};
+
+export const UndoBar = () => {
+  const room = useStore((s) => s.room);
+  const seatId = useStore((s) => s.seatId);
+  const vote = room?.undoVote ?? null;
+  const seconds = useSecondsLeft(vote?.expiresAt ?? null);
+  const canRequest = Boolean(
+    seatId && room?.undoAvailableTo === seatId && room.status === 'playing',
+  );
+  const mustVote = Boolean(
+    vote && seatId && vote.voters.includes(seatId) && !vote.approvals.includes(seatId),
+  );
+
+  return (
+    <AnimatePresence>
+      {vote ? (
+        <motion.div
+          key="vote"
+          className="undo-bar undo-bar--vote"
+          initial={{ y: -40, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: -40, opacity: 0 }}
+        >
+          <span>
+            {nameOf(room, vote.requesterId)} wants to take back their last turn ({seconds}s)
+          </span>
+          {mustVote ? (
+            <span className="undo-bar__actions">
+              <button
+                className="btn btn--small btn--ghost"
+                type="button"
+                onClick={() => send({ type: 'undoVote', approve: false })}
+              >
+                No
+              </button>
+              <button
+                className="btn btn--small btn--primary"
+                type="button"
+                onClick={() => send({ type: 'undoVote', approve: true })}
+              >
+                Allow
+              </button>
+            </span>
+          ) : (
+            <span className="muted small">Waiting for votes...</span>
+          )}
+        </motion.div>
+      ) : canRequest ? (
+        <motion.button
+          key="request"
+          type="button"
+          className="undo-chip"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          onClick={() => send({ type: 'undoRequest' })}
+        >
+          ↶ Take back my turn
+        </motion.button>
+      ) : null}
+    </AnimatePresence>
+  );
+};

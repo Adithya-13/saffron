@@ -7,8 +7,15 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "dev": "pnpm --filter @saffron/web build && pnpm --filter @saffron/server dev",
+    "dev:web": "pnpm --filter @saffron/web dev",
+    "build": "pnpm --filter @saffron/web build",
+    "deploy": "pnpm build && pnpm --filter @saffron/server deploy",
+    "assets": "./scripts/build-assets.sh",
+    "sim": "pnpm --filter @saffron/bot sim",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "playwright test",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -16,6 +23,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
     "eslint": "10.15.0",
     "prettier": "3.10.1",
     "typescript": "6.0.3",
