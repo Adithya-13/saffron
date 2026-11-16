@@ -1,0 +1,21 @@
+{
+  "name": "@saffron/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@saffron/bot": "workspace:*",
+    "@saffron/content": "workspace:*",
+    "@saffron/engine": "workspace:*",
+    "@saffron/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261116.1",
+    "wrangler": "4.162.0"
+  }
+}
