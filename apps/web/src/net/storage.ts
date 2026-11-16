@@ -24,3 +24,7 @@ export const saveToken = (code: string, token: string): void => write(tokenKey(c
 export const loadSetting = (key: string): string | null => read(`saffron:setting:${key}`);
 export const saveSetting = (key: string, value: string): void =>
   write(`saffron:setting:${key}`, value);
+
+const BLIND_TIP_KEY = 'saffron:tip:blind';
+export const blindTipSeen = (): boolean => read(BLIND_TIP_KEY) === 'seen';
+export const markBlindTipSeen = (): void => write(BLIND_TIP_KEY, 'seen');

@@ -18,8 +18,11 @@ export const ChatPanel = ({ active = true }: { active?: boolean }) => {
     if (active) markChatRead();
   }, [lastId, active, markChatRead]);
 
+  const heardId = useRef(lastId);
   useEffect(() => {
-    if (lastId && lastSeat && lastSeat !== seatId) play('pop', { volume: 0.5 });
+    if (lastId === heardId.current) return;
+    heardId.current = lastId;
+    if (lastSeat && lastSeat !== seatId) play('pop', { volume: 0.35 });
   }, [lastId, lastSeat, seatId]);
 
   return (

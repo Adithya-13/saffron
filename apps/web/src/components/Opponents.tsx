@@ -36,7 +36,10 @@ export const Opponents = ({ others, onOpen }: StripProps) => {
   const connected = (id: string) => room?.seats.find((s) => s.id === id)?.connected ?? false;
 
   return (
-    <section className="opponents" aria-label="Other merchants">
+    <section
+      className={`opponents${others.length >= 4 ? ' opponents--many' : ''}`}
+      aria-label="Other merchants"
+    >
       {others.map((p) => {
         const bonuses = bonusesOf(p.cards);
         const name = nameOf(room, p.id);
@@ -51,7 +54,11 @@ export const Opponents = ({ others, onOpen }: StripProps) => {
             aria-label={`${name}, ${p.points} prestige${active ? ', playing now' : ''}`}
           >
             <span className="opp__head">
-              <Avatar index={seatIndex(room, p.id)} name={name} size={22} />
+              <Avatar
+                index={seatIndex(room, p.id)}
+                name={name}
+                size={others.length >= 4 ? 20 : 22}
+              />
               <span className="opp__name">
                 {name}
                 {!connected(p.id) && <span className="opp__away"> · away</span>}

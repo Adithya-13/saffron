@@ -42,6 +42,7 @@ const perform = async (message: SyncMessage): Promise<void> => {
       ...(cue.volume === undefined ? {} : { volume: cue.volume }),
     });
   if (plan.banner) showBanner(plan.banner);
+  if (plan.banner?.tone === 'turn' && 'vibrate' in navigator) navigator.vibrate(30);
   if (reduced || plan.flights.length === 0) {
     await wait(reduced ? 0 : SETTLE_MS);
     return;

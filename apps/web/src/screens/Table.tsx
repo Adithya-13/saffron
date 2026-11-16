@@ -4,6 +4,7 @@ import { useAnim } from '../anim/animStore.ts';
 import { ChatIcon, LogIcon, MenuIcon } from '../art/Icons.tsx';
 import { cardArt } from '../components/Card.tsx';
 import { CardDetail } from '../components/CardDetail.tsx';
+import { ChatBubble } from '../components/ChatBubble.tsx';
 import { ChatPanel } from '../components/ChatPanel.tsx';
 import { Dock } from '../components/Dock.tsx';
 import { EndScreen } from '../components/EndScreen.tsx';
@@ -113,6 +114,7 @@ export const Table = () => {
         </button>
       </header>
 
+      <ChatBubble suppressed={panel?.kind === 'chat'} onOpen={() => setPanel({ kind: 'chat' })} />
       <UndoBar />
 
       <main className="board">

@@ -6,6 +6,7 @@ import { connect, disconnect } from '../net/socket.ts';
 import { loadName, saveName } from '../net/storage.ts';
 import { useStore } from '../state/store.ts';
 import { Toasts } from '../components/Toasts.tsx';
+import { useRoomTheme } from '../theme/useRoomTheme.ts';
 import { Lobby } from './Lobby.tsx';
 import { Table } from './Table.tsx';
 import { MAX_NAME_LENGTH } from '@saffron/protocol';
@@ -68,6 +69,7 @@ export const RoomScreen = ({ code }: { code: string }) => {
   const connection = useStore((s) => s.connection);
   const room = useStore((s) => s.room);
   const reconnecting = connection === 'reconnecting';
+  useRoomTheme(room?.theme);
 
   useEffect(() => {
     if (!hasName) return;

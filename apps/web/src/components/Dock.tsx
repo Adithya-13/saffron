@@ -4,11 +4,10 @@ import type { Move, PlayerPublic } from '@saffron/engine';
 import { anchors } from '../anim/plan.ts';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { send } from '../net/socket.ts';
+import { blindTipSeen } from '../net/storage.ts';
 import { draftToMove, isLegal } from '../state/moves.ts';
 import { currentOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
-import { Card, CardBack } from './Card.tsx';
-import { affordable } from './Market.tsx';
 import { Points } from './Opponents.tsx';
 
 const submit = (move: Move) => send({ type: 'move', move });
@@ -39,34 +38,6 @@ const Holdings = ({ me }: { readonly me: PlayerPublic }) => {
             {me.tokens[t]}
           </span>
         </span>
-      ))}
-    </div>
-  );
-};
-
-const Reserve = ({ me }: { readonly me: PlayerPublic }) => {
-  const select = useStore((s) => s.select);
-  return (
-    <div
-      className="dock__reserve"
-      data-anchor={anchors.reserve(me.id)}
-      aria-label="Your reserved cards"
-    >
-      {me.reserved.map((r, i) => (
-        <button
-          key={`${i}-${r.card?.id ?? r.tier}`}
-          type="button"
-          className="reserve-thumb"
-          data-anchor={anchors.reserveSlot(me.id, i)}
-          onClick={() => select({ kind: 'reserve', playerId: me.id, index: i })}
-          aria-label={`Reserved card ${i + 1}`}
-        >
-          {r.card ? (
-            <Card card={r.card} state={affordable(me, r.card) ? 'affordable' : 'idle'} label="" />
-          ) : (
-            <CardBack tier={r.tier} />
-          )}
-        </button>
       ))}
     </div>
   );
@@ -137,6 +108,14 @@ const Action = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTurn: bo
       </>
     );
   }
+  if (!blindTipSeen() && me.reserved.length === 0 && me.cards.length < 4) {
+    return (
+      <p className="dock__hint dock__hint--strong">
+        Your turn. Tip: tap a deck <span className="dock__deck-chip">III</span> to reserve a hidden
+        card and a Seal.
+      </p>
+    );
+  }
   return (
     <p className="dock__hint dock__hint--strong">
       {me.reserved.length > 0
@@ -162,7 +141,6 @@ export const Dock = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTur
         <Holdings me={me} />
       </div>
       <div className="dock__row">
-        <Reserve me={me} />
         <Action me={me} myTurn={myTurn} />
       </div>
     </footer>

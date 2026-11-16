@@ -2,6 +2,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { GAME_NAME } from '@saffron/content';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@saffron/engine';
+import { THEMES } from '@saffron/protocol';
+import type { Theme } from '@saffron/protocol';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
 import { ChatPanel } from '../components/ChatPanel.tsx';
@@ -9,6 +11,37 @@ import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Avatar } from '../components/Avatar.tsx';
 import { CloseIcon } from '../art/Icons.tsx';
 import { shareUrl } from '../components/MenuSheet.tsx';
+import { THEME_INFO } from '../theme/useRoomTheme.ts';
+
+const SWATCHES: Readonly<Record<Theme, readonly string[]>> = {
+  paper: ['#f4eee3', '#1e1b16', '#d6941c'],
+  night: ['#15132b', '#f2e9d6', '#d8b25a'],
+  harbour: ['#e8edef', '#1b2830', '#2c6d66'],
+};
+
+const ThemePicker = ({ theme, isHost }: { readonly theme: Theme; readonly isHost: boolean }) => (
+  <fieldset className="theme-pick">
+    <legend>{isHost ? 'Table look' : 'Table look, picked by the host'}</legend>
+    {THEMES.map((t) => (
+      <label key={t} className="theme-pick__option">
+        <input
+          type="radio"
+          name="theme"
+          value={t}
+          checked={theme === t}
+          disabled={!isHost}
+          onChange={() => send({ type: 'setTheme', theme: t })}
+        />
+        <span className="theme-pick__swatch" aria-hidden>
+          {SWATCHES[t].map((c) => (
+            <span key={c} style={{ background: c }} />
+          ))}
+        </span>
+        {THEME_INFO[t].label}
+      </label>
+    ))}
+  </fieldset>
+);
 
 export const Lobby = () => {
   const room = useStore((s) => s.room);
@@ -43,7 +76,9 @@ export const Lobby = () => {
           </button>
         </div>
 
-        <ul className="seats">
+        <ThemePicker theme={room.theme} isHost={isHost} />
+
+        <ul className={`seats${room.seats.length > 4 ? ' seats--many' : ''}`}>
           <AnimatePresence initial={false}>
             {room.seats.map((seat, index) => (
               <motion.li
@@ -75,12 +110,14 @@ export const Lobby = () => {
               </motion.li>
             ))}
           </AnimatePresence>
-          {Array.from({ length: openSeats }, (_, i) => (
-            <li key={`open-${i}`} className="seat seat--open">
+          {openSeats > 0 && (
+            <li className="seat seat--open">
               <span className="seat__placeholder" />
-              <span className="seat__name">Waiting for a merchant...</span>
+              <span className="seat__name">
+                {openSeats === 1 ? '1 seat left' : `Waiting for merchants, ${openSeats} seats left`}
+              </span>
             </li>
-          ))}
+          )}
         </ul>
 
         <div className="lobby__actions">

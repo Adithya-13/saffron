@@ -60,8 +60,8 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await shot(ana, '04-card-selected');
   await ana.getByRole('button', { name: /^Reserve/ }).click();
   await waitForMyTurn(budi);
-  await expect(ana.locator('.dock .reserve-thumb')).toHaveCount(1);
-  await ana.locator('.dock .reserve-thumb').first().click();
+  await expect(ana.locator('.market__row--reserve .market__slot')).toHaveCount(1);
+  await ana.locator('.market__row--reserve button.card').first().click();
   await expect(ana.locator('.detail')).toBeVisible();
   await shot(ana, '04b-reserved-detail');
   await ana.getByRole('button', { name: 'Close' }).click();
@@ -71,11 +71,14 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await shot(budi, '05-undo-vote');
   await budi.getByRole('button', { name: 'Allow' }).click();
   await waitForMyTurn(ana);
-  await expect(ana.locator('.dock .reserve-thumb')).toHaveCount(0);
+  await expect(ana.locator('.market__row--reserve')).toHaveCount(0);
 
   await ana.getByRole('button', { name: /^Chat/ }).click();
   await ana.getByLabel('Chat message').fill('Good luck, Budi!');
   await ana.getByRole('button', { name: 'Send' }).click();
+  await expect(budi.locator('.chat-bubble', { hasText: 'Good luck, Budi!' })).toBeVisible();
+  await shot(budi, '05a-chat-bubble');
+  await expect(budi.locator('.chat-bubble')).toBeHidden({ timeout: 6_000 });
   await expect(budi.locator('.icon-btn__dot')).toBeVisible();
   await budi.getByRole('button', { name: /^Chat/ }).click();
   await expect(budi.locator('.chat__text', { hasText: 'Good luck, Budi!' })).toBeVisible();
@@ -110,7 +113,9 @@ const playOneTurn = async (page: Page): Promise<void> => {
     return;
   }
   const affordableCard = page
-    .locator('.market button.card.card--affordable, .dock .reserve-thumb:has(.card--affordable)')
+    .locator(
+      '.market button.card.card--affordable, .market__row--reserve button.card.card--affordable',
+    )
     .last();
   if ((await affordableCard.count()) > 0) {
     await affordableCard.click();
@@ -179,4 +184,22 @@ test('solo game against a bot advances automatically', async ({ browser }) => {
   await solo.getByRole('button', { name: 'Move log' }).click();
   await expect(solo.locator('.log__line')).toHaveCount(3);
   await shot(solo, '07-vs-bots');
+});
+
+test('host fills eight seats and picks a theme', async ({ browser }) => {
+  const host = await newPlayer(browser);
+  await host.goto('/');
+  await host.getByLabel('Your merchant name').fill('Eka');
+  await host.getByRole('button', { name: 'Host a new game' }).click();
+  for (let i = 0; i < 7; i++) await host.getByRole('button', { name: 'Add a bot' }).click();
+  await expect(host.locator('.seats .seat:not(.seat--open)')).toHaveCount(8);
+  await expect(host.getByRole('button', { name: 'Add a bot' })).toBeDisabled();
+  await host.getByText('Night', { exact: true }).click();
+  await expect(host.locator('html')).toHaveAttribute('data-theme', 'night');
+  await shot(host, '10-lobby-eight-night');
+  await host.getByRole('button', { name: 'Open the market' }).click();
+  await waitForMyTurn(host);
+  await expect(host.locator('.opponents--many .opp')).toHaveCount(7);
+  await host.waitForTimeout(800);
+  await shot(host, '11-table-eight-night');
 });

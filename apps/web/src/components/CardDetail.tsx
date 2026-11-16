@@ -171,9 +171,19 @@ export const CardDetail = ({ me, interactive }: Props) => {
             {me && (!owner || owner === seatId) && <Payment card={card} me={me} />}
           </dl>
         ) : (
-          <p className="detail__note">
-            {view.deckCounts[tier]} cards left. Reserve the top card without seeing it first.
-          </p>
+          <div className="detail__blind">
+            <p className="detail__note">
+              <strong>Blind reserve.</strong> Take the top card of this deck into your hand without
+              seeing it first. Nobody else sees it either, so they can&apos;t tell what you&apos;re
+              building.
+            </p>
+            <p className="detail__note">
+              {view.supply.seal > 0
+                ? 'You also get a Royal Seal, which pays for any spice.'
+                : 'No Royal Seals left, so you only get the card.'}{' '}
+              {view.deckCounts[tier]} cards left.
+            </p>
+          </div>
         )}
         {note && <p className="detail__note">{note}</p>}
         {interactive && (buy || reserve) && (
