@@ -1,13 +1,15 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { CloseIcon } from '../art/Icons.tsx';
 
 type Props = {
   readonly title: string;
   readonly onClose?: () => void;
+  readonly tall?: boolean;
   readonly children: ReactNode;
 };
 
-export const Sheet = ({ title, onClose, children }: Props) => {
+export const Sheet = ({ title, onClose, tall = false, children }: Props) => {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -18,7 +20,7 @@ export const Sheet = ({ title, onClose, children }: Props) => {
   return (
     <dialog
       ref={ref}
-      className="sheet"
+      className={`sheet${tall ? ' sheet--tall' : ''}`}
       aria-label={title}
       onCancel={(e) => {
         e.preventDefault();
@@ -28,17 +30,15 @@ export const Sheet = ({ title, onClose, children }: Props) => {
         if (e.target === ref.current) onClose?.();
       }}
     >
-      <div className="sheet__body">
-        <header className="sheet__header">
-          <h2 className="sheet__title">{title}</h2>
-          {onClose && (
-            <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
-              ×
-            </button>
-          )}
-        </header>
-        {children}
-      </div>
+      <header className="sheet__header">
+        <h2 className="sheet__title">{title}</h2>
+        {onClose && (
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <CloseIcon />
+          </button>
+        )}
+      </header>
+      <div className="sheet__body">{children}</div>
     </dialog>
   );
 };

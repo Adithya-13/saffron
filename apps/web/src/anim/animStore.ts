@@ -15,16 +15,14 @@ export type Flight = {
   readonly to: Point;
   readonly delay: number;
   readonly duration: number;
-  readonly showcase: boolean;
 };
 
 type AnimState = {
   readonly flights: readonly Flight[];
   readonly banner: (Banner & { readonly id: number }) | null;
-  readonly burstId: number;
 };
 
-export const useAnim = create<AnimState>()(() => ({ flights: [], banner: null, burstId: 0 }));
+export const useAnim = create<AnimState>()(() => ({ flights: [], banner: null }));
 
 let counter = 0;
 export const nextAnimId = (): number => ++counter;
@@ -40,8 +38,6 @@ export const showBanner = (banner: Banner): void =>
 
 export const hideBanner = (id: number): void =>
   useAnim.setState((s) => (s.banner?.id === id ? { banner: null } : s));
-
-export const fireBurst = (): void => useAnim.setState((s) => ({ burstId: s.burstId + 1 }));
 
 export const prefersReducedMotion = (): boolean =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;

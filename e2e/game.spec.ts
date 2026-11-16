@@ -7,8 +7,10 @@ const shot = async (page: Page, name: string): Promise<void> => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png` });
 };
 
-const newPlayer = async (browser: Browser, viewport = { width: 1440, height: 900 }) => {
-  const context = await browser.newContext({ viewport });
+const PHONE = { width: 390, height: 664 };
+
+const newPlayer = async (browser: Browser, viewport = PHONE) => {
+  const context = await browser.newContext({ viewport, hasTouch: true });
   return context.newPage();
 };
 
@@ -23,7 +25,7 @@ const waitForMyTurn = (page: Page) =>
   expect(page.locator('.topbar__turn')).toHaveText('Your turn', { timeout: 15_000 });
 
 test('two friends play, undo, chat and reconnect', async ({ browser }) => {
-  const ana = await newPlayer(browser);
+  const ana = await newPlayer(browser, { width: 1280, height: 860 });
   await ana.goto('/');
   await ana.getByLabel('Your merchant name').fill('Ana');
   await shot(ana, '01-home');
@@ -31,7 +33,7 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
   const roomUrl = ana.url();
 
-  const budi = await newPlayer(browser, { width: 390, height: 844 });
+  const budi = await newPlayer(browser);
   await budi.goto(roomUrl);
   await budi.getByLabel('Your merchant name').fill('Budi');
   await budi.getByRole('button', { name: 'Enter' }).click();
@@ -48,33 +50,43 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
 
   await takeSpices(ana, ['Saffron', 'Cardamom', 'Sumac']);
   await waitForMyTurn(budi);
-  await expect(ana.locator('.player--self .chip__count').first()).toHaveText('1');
+  await expect(ana.getByLabel('1 Saffron tokens')).toBeVisible();
 
   await takeSpices(budi, ['Pepper', 'Pepper']);
   await waitForMyTurn(ana);
 
   await ana.locator('.market__row--t1 .market__slot button.card').first().click();
+  await expect(ana.locator('.detail')).toBeVisible();
   await shot(ana, '04-card-selected');
   await ana.getByRole('button', { name: /^Reserve/ }).click();
   await waitForMyTurn(budi);
-  await expect(ana.locator('.player--self .player__reserved')).toHaveCount(1);
+  await expect(ana.locator('.dock .reserve-thumb')).toHaveCount(1);
+  await ana.locator('.dock .reserve-thumb').first().click();
+  await expect(ana.locator('.detail')).toBeVisible();
+  await shot(ana, '04b-reserved-detail');
+  await ana.getByRole('button', { name: 'Close' }).click();
 
   await ana.getByRole('button', { name: /Take back my turn/ }).click();
   await expect(budi.getByRole('button', { name: 'Allow' })).toBeVisible();
   await shot(budi, '05-undo-vote');
   await budi.getByRole('button', { name: 'Allow' }).click();
   await waitForMyTurn(ana);
-  await expect(ana.locator('.player--self .player__reserved')).toHaveCount(0);
+  await expect(ana.locator('.dock .reserve-thumb')).toHaveCount(0);
 
-  await ana.getByRole('tab', { name: /Chat/ }).click();
+  await ana.getByRole('button', { name: /^Chat/ }).click();
   await ana.getByLabel('Chat message').fill('Good luck, Budi!');
   await ana.getByRole('button', { name: 'Send' }).click();
-  await budi.getByRole('tab', { name: /Chat/ }).click();
+  await expect(budi.locator('.icon-btn__dot')).toBeVisible();
+  await budi.getByRole('button', { name: /^Chat/ }).click();
   await expect(budi.locator('.chat__text', { hasText: 'Good luck, Budi!' })).toBeVisible();
+  await shot(budi, '05b-chat-sheet');
+  await budi.getByRole('button', { name: 'Close' }).click();
+  await ana.getByRole('button', { name: 'Close' }).click();
 
   await budi.reload();
   await expect(budi.locator('.topbar__turn')).toHaveText("Ana's turn", { timeout: 15_000 });
-  await expect(budi.locator('.player--self .player__name')).toContainText('Budi');
+  await expect(budi.getByRole('button', { name: /^Ana, \d+ prestige/ })).toBeVisible();
+  await expect(budi.locator('.dock')).toBeVisible();
 
   await takeSpices(ana, ['Salt', 'Pepper', 'Saffron']);
   await waitForMyTurn(budi);
@@ -92,13 +104,13 @@ const playOneTurn = async (page: Page): Promise<void> => {
     await returnButton.click();
     return;
   }
-  const guildChoice = page.locator('.guild-choice button.guild');
+  const guildChoice = page.locator('.guild-choice button.guild-option');
   if ((await guildChoice.count()) > 0) {
     await guildChoice.first().click();
     return;
   }
   const affordableCard = page
-    .locator('.market button.card.card--affordable, .player--self button.card.card--affordable')
+    .locator('.market button.card.card--affordable, .dock .reserve-thumb:has(.card--affordable)')
     .last();
   if ((await affordableCard.count()) > 0) {
     await affordableCard.click();
@@ -164,6 +176,7 @@ test('solo game against a bot advances automatically', async ({ browser }) => {
   await takeSpices(solo, ['Saffron', 'Sumac', 'Salt']);
   await expect(solo.locator('.topbar__turn')).not.toHaveText('Your turn');
   await waitForMyTurn(solo);
+  await solo.getByRole('button', { name: 'Move log' }).click();
   await expect(solo.locator('.log__line')).toHaveCount(3);
   await shot(solo, '07-vs-bots');
 });

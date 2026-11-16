@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { SPICE_INFO } from '@saffron/content';
-import { TOKENS, tokensFrom, totalTokens } from '@saffron/engine';
+import { SPICES, TOKENS, tokensFrom, totalTokens } from '@saffron/engine';
 import type { PlayerPublic, Token } from '@saffron/engine';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
-import { GuildTile } from './GuildTile.tsx';
+import { CostPip } from './CostPip.tsx';
+import { guildArt } from './Guilds.tsx';
 import { Sheet } from './Sheet.tsx';
 
 const DiscardSheet = ({ me, excess }: { me: PlayerPublic; excess: number }) => {
@@ -24,7 +25,7 @@ const DiscardSheet = ({ me, excess }: { me: PlayerPublic; excess: number }) => {
       <div className="discard">
         {TOKENS.filter((t) => me.tokens[t] > 0).map((t) => (
           <div key={t} className="discard__row">
-            <SpiceIcon token={t} size={36} />
+            <SpiceIcon token={t} size={32} />
             <span className="discard__label">
               {SPICE_INFO[t].label} <span className="muted">({me.tokens[t]})</span>
             </span>
@@ -69,12 +70,20 @@ const GuildSheet = ({ options }: { options: readonly string[] }) => {
         {guilds
           .filter((g) => options.includes(g.id))
           .map((g) => (
-            <GuildTile
+            <button
               key={g.id}
-              guild={g}
-              highlight
+              type="button"
+              className="guild-option"
               onClick={() => send({ type: 'move', move: { type: 'chooseGuild', guildId: g.id } })}
-            />
+            >
+              <img src={guildArt(g)} alt="" />
+              <span className="guild-option__name">{g.name}</span>
+              <span className="guild__needs">
+                {SPICES.filter((s) => g.requires[s] > 0).map((s) => (
+                  <CostPip key={s} spice={s} amount={g.requires[s]} />
+                ))}
+              </span>
+            </button>
           ))}
       </div>
     </Sheet>

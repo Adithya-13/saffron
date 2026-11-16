@@ -7,8 +7,8 @@ import { useStore } from '../state/store.ts';
 import { ChatPanel } from '../components/ChatPanel.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Avatar } from '../components/Avatar.tsx';
-
-const shareUrl = (code: string): string => `${location.origin}/r/${code}`;
+import { CloseIcon } from '../art/Icons.tsx';
+import { shareUrl } from '../components/MenuSheet.tsx';
 
 export const Lobby = () => {
   const room = useStore((s) => s.room);
@@ -32,7 +32,6 @@ export const Lobby = () => {
 
   return (
     <main className="lobby">
-      <div className="lobby__backdrop" />
       <section className="lobby__main panel">
         <p className="eyebrow">{GAME_NAME}</p>
         <h1 className="lobby__title">The stall is open</h1>
@@ -51,9 +50,9 @@ export const Lobby = () => {
                 key={seat.id}
                 className="seat"
                 layout
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
                 <Avatar index={index} name={seat.name} />
                 <span className="seat__name">
@@ -70,7 +69,7 @@ export const Lobby = () => {
                     aria-label={`Remove ${seat.name}`}
                     onClick={() => send({ type: 'removeSeat', seatId: seat.id })}
                   >
-                    ×
+                    <CloseIcon />
                   </button>
                 )}
               </motion.li>

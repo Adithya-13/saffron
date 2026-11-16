@@ -14,7 +14,6 @@ export type FlightSpec = {
   readonly to: readonly string[];
   readonly delay: number;
   readonly duration: number;
-  readonly showcase?: boolean;
 };
 
 export type SoundCue = { readonly name: SfxName; readonly delay: number; readonly volume?: number };
@@ -25,14 +24,13 @@ export type Plan = {
   readonly flights: readonly FlightSpec[];
   readonly sounds: readonly SoundCue[];
   readonly banner: Banner | null;
-  readonly burst: boolean;
   readonly duration: number;
 };
 
 const TOKEN_GAP = 70;
 const TOKEN_FLIGHT = 520;
 const CARD_FLIGHT = 640;
-const SHOWCASE_FLIGHT = 1700;
+const GUILD_FLIGHT = 900;
 
 export const anchors = {
   supply: (t: Token) => `supply-${t}`,
@@ -70,7 +68,7 @@ const clinks = (count: number, start: number, volume = 0.8): SoundCue[] =>
     volume,
   }));
 
-type Part = { flights: FlightSpec[]; sounds: SoundCue[]; banner?: Banner; burst?: boolean };
+type Part = { flights: FlightSpec[]; sounds: SoundCue[]; banner?: Banner };
 
 const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Part => {
   switch (event.type) {
@@ -175,12 +173,13 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
             from: [anchors.guild(event.guild.id)],
             to: [anchors.guilds(event.playerId), anchors.player(event.playerId)],
             delay: at,
-            duration: SHOWCASE_FLIGHT,
-            showcase: true,
+            duration: GUILD_FLIGHT,
           },
         ],
-        sounds: [{ name: 'fanfare', delay: at + 150 }],
-        burst: true,
+        sounds: [
+          { name: 'stamp', delay: at + GUILD_FLIGHT - 120, volume: 0.6 },
+          { name: 'chime', delay: at + GUILD_FLIGHT, volume: 0.6 },
+        ],
       };
     case 'marketRefilled':
       return event.card
@@ -190,14 +189,14 @@ const planEvent = (event: VisibleEvent, viewerId: string | null, at: number): Pa
       return event.playerId === viewerId
         ? {
             flights: [],
-            sounds: [{ name: 'bell', delay: at + 150 }],
+            sounds: [{ name: 'bell', delay: at + 150, volume: 0.6 }],
             banner: { text: 'Your turn', tone: 'turn' },
           }
         : { flights: [], sounds: [] };
     case 'finalRound':
       return {
         flights: [],
-        sounds: [{ name: 'drum', delay: at }],
+        sounds: [{ name: 'bell', delay: at, volume: 0.7 }],
         banner: { text: 'Final round', tone: 'final' },
       };
     case 'passed':
@@ -220,14 +219,12 @@ export const planEvents = (events: readonly VisibleEvent[], viewerId: string | n
   const flights: FlightSpec[] = [];
   const sounds: SoundCue[] = [];
   let banner: Banner | null = null;
-  let burst = false;
   for (const event of events) {
     cursor += STEP_GAP[event.type] ?? 0;
     const part = planEvent(event, viewerId, cursor);
     flights.push(...part.flights);
     sounds.push(...part.sounds);
     if (part.banner && banner?.tone !== 'final') banner = part.banner;
-    burst = burst || Boolean(part.burst);
     const partEnd = Math.max(cursor, ...part.flights.map((f) => f.delay + f.duration));
     if (
       event.type === 'guildClaimed' ||
@@ -238,5 +235,5 @@ export const planEvents = (events: readonly VisibleEvent[], viewerId: string | n
     }
   }
   const duration = Math.max(0, ...flights.map((f) => f.delay + f.duration));
-  return { flights, sounds, banner, burst, duration };
+  return { flights, sounds, banner, duration };
 };

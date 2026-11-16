@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import { SPICE_INFO } from '@saffron/content';
 import { SPICES } from '@saffron/engine';
 import type { Spice } from '@saffron/engine';
@@ -7,9 +6,7 @@ import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { canAddToDraft } from '../state/moves.ts';
 import { useStore } from '../state/store.ts';
 
-const MAX_STACK = 4;
-
-export const Supply = ({ interactive }: { interactive: boolean }) => {
+export const Supply = ({ interactive }: { readonly interactive: boolean }) => {
   const view = useStore((s) => s.view);
   const legal = useStore((s) => s.legal);
   const draft = useStore((s) => s.draft);
@@ -18,7 +15,10 @@ export const Supply = ({ interactive }: { interactive: boolean }) => {
   if (!view) return null;
 
   const pick = (spice: Spice) => {
-    if (!interactive) return;
+    if (!interactive) {
+      showToast('Wait for your turn to take spices');
+      return;
+    }
     if (canAddToDraft(legal, draft, spice)) {
       setDraft([...draft, spice]);
       return;
@@ -34,35 +34,25 @@ export const Supply = ({ interactive }: { interactive: boolean }) => {
   return (
     <section className="supply" aria-label="Spice supply">
       {[...SPICES, 'seal' as const].map((token) => {
-        const count = view.supply[token];
-        const pending = token === 'seal' ? 0 : draft.filter((s) => s === token).length;
+        const picked = token === 'seal' ? 0 : draft.filter((s) => s === token).length;
+        const left = view.supply[token] - picked;
         const available = token !== 'seal' && interactive && canAddToDraft(legal, draft, token);
-        const Tag = token === 'seal' ? 'div' : 'button';
         return (
-          <Tag
+          <button
             key={token}
-            type={Tag === 'button' ? 'button' : undefined}
-            className={`pile${available ? ' pile--available' : ''}${count === 0 ? ' pile--empty' : ''}`}
+            type="button"
+            className={`pile${available ? ' pile--available' : ''}${picked > 0 ? ' pile--picked' : ''}${left === 0 ? ' pile--empty' : ''}`}
+            disabled={token === 'seal'}
             onClick={token === 'seal' ? undefined : () => pick(token)}
-            aria-label={`${SPICE_INFO[token].label}: ${count} left`}
+            aria-label={`${SPICE_INFO[token].label}: ${view.supply[token]} left`}
             data-anchor={anchors.supply(token)}
           >
-            <span className="pile__stack">
-              {Array.from({ length: Math.min(Math.max(count - pending, 0), MAX_STACK) }, (_, i) => (
-                <motion.span
-                  key={i}
-                  className="pile__token"
-                  style={{ bottom: i * 5, zIndex: i }}
-                  layout
-                >
-                  <SpiceIcon token={token} size={48} />
-                </motion.span>
-              ))}
-              {count === 0 && <span className="pile__ghost" />}
+            <SpiceIcon token={token} size={32} className="spice-disc" />
+            <span className="pile__count">
+              {left}
+              {picked > 0 && <span className="pile__picked"> −{picked}</span>}
             </span>
-            <span className="pile__count">{count - pending}</span>
-            <span className="pile__label">{SPICE_INFO[token].label}</span>
-          </Tag>
+          </button>
         );
       })}
     </section>

@@ -2,13 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { play } from '../audio/sound.ts';
 import { useStore } from '../state/store.ts';
 import type { SyncMessage } from '../state/store.ts';
-import {
-  addFlights,
-  fireBurst,
-  nextAnimId,
-  prefersReducedMotion,
-  showBanner,
-} from './animStore.ts';
+import { addFlights, nextAnimId, prefersReducedMotion, showBanner } from './animStore.ts';
 import type { Flight, Point } from './animStore.ts';
 import { planEvents } from './plan.ts';
 import type { FlightSpec } from './plan.ts';
@@ -48,7 +42,6 @@ const perform = async (message: SyncMessage): Promise<void> => {
       ...(cue.volume === undefined ? {} : { volume: cue.volume }),
     });
   if (plan.banner) showBanner(plan.banner);
-  if (plan.burst) setTimeout(fireBurst, 700);
   if (reduced || plan.flights.length === 0) {
     await wait(reduced ? 0 : SETTLE_MS);
     return;
@@ -67,7 +60,6 @@ const perform = async (message: SyncMessage): Promise<void> => {
         to,
         delay: spec.delay,
         duration: spec.duration,
-        showcase: spec.showcase ?? false,
       },
     ];
   });

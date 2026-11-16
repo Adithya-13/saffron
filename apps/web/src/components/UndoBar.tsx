@@ -19,22 +19,20 @@ export const UndoBar = () => {
   const seatId = useStore((s) => s.seatId);
   const vote = room?.undoVote ?? null;
   const seconds = useSecondsLeft(vote?.expiresAt ?? null);
-  const canRequest = Boolean(
-    seatId && room?.undoAvailableTo === seatId && room.status === 'playing',
-  );
   const mustVote = Boolean(
     vote && seatId && vote.voters.includes(seatId) && !vote.approvals.includes(seatId),
   );
 
   return (
     <AnimatePresence>
-      {vote ? (
+      {vote && (
         <motion.div
           key="vote"
-          className="undo-bar undo-bar--vote"
-          initial={{ y: -40, opacity: 0 }}
+          className="undo-bar"
+          role="alertdialog"
+          initial={{ y: -12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: -40, opacity: 0 }}
+          exit={{ y: -12, opacity: 0 }}
         >
           <span>
             {nameOf(room, vote.requesterId)} wants to take back their last turn ({seconds}s)
@@ -60,19 +58,7 @@ export const UndoBar = () => {
             <span className="muted small">Waiting for votes...</span>
           )}
         </motion.div>
-      ) : canRequest ? (
-        <motion.button
-          key="request"
-          type="button"
-          className="undo-chip"
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.8 }}
-          onClick={() => send({ type: 'undoRequest' })}
-        >
-          ↶ Take back my turn
-        </motion.button>
-      ) : null}
+      )}
     </AnimatePresence>
   );
 };

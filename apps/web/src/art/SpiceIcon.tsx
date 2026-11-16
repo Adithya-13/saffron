@@ -2,19 +2,18 @@ import type { ReactElement } from 'react';
 import type { Token } from '@saffron/engine';
 
 type Palette = {
-  readonly light: string;
   readonly base: string;
-  readonly dark: string;
+  readonly ring: string;
   readonly glyph: string;
 };
 
 export const PALETTES: Readonly<Record<Token, Palette>> = {
-  saffron: { light: '#ffd27a', base: '#e8962e', dark: '#9c4f12', glyph: '#5a2a07' },
-  cardamom: { light: '#b8e0a0', base: '#5f9e5a', dark: '#24502c', glyph: '#f3f7e6' },
-  sumac: { light: '#f08a9b', base: '#b8324a', dark: '#5f1023', glyph: '#fde9ec' },
-  pepper: { light: '#8a8794', base: '#45434d', dark: '#16151b', glyph: '#e9e4f5' },
-  salt: { light: '#ffffff', base: '#e6dfd2', dark: '#9d9384', glyph: '#5b5346' },
-  seal: { light: '#fff0a8', base: '#d4a72c', dark: '#7a5208', glyph: '#5e3a02' },
+  saffron: { base: '#c98a1b', ring: '#a06c10', glyph: '#fff6e2' },
+  cardamom: { base: '#5e7d4f', ring: '#47613b', glyph: '#f3f1e4' },
+  sumac: { base: '#9c3b32', ring: '#7a2c25', glyph: '#fbede8' },
+  pepper: { base: '#3a3632', ring: '#1e1b16', glyph: '#ede7dc' },
+  salt: { base: '#ece6da', ring: '#a79d8c', glyph: '#5b5347' },
+  seal: { base: '#8a6a2c', ring: '#6b5020', glyph: '#fbf3df' },
 };
 
 const GLYPHS: Readonly<Record<Token, (color: string) => ReactElement>> = {
@@ -58,7 +57,7 @@ const GLYPHS: Readonly<Record<Token, (color: string) => ReactElement>> = {
       <circle cx="38" cy="58" r="12" />
       <circle cx="62" cy="58" r="12" />
       <circle cx="50" cy="37" r="12" />
-      <g fill="#000" fillOpacity="0.25">
+      <g fill="#000" fillOpacity="0.2">
         <path d="M33 55 q5 -4 10 0" />
         <path d="M57 55 q5 -4 10 0" />
         <path d="M45 34 q5 -4 10 0" />
@@ -96,8 +95,6 @@ type Props = { readonly token: Token; readonly size?: number; readonly className
 
 export const SpiceIcon = ({ token, size = 40, className }: Props) => {
   const p = PALETTES[token];
-  const id = `spice-${token}`;
-  const isSeal = token === 'seal';
   return (
     <svg
       className={className}
@@ -107,49 +104,26 @@ export const SpiceIcon = ({ token, size = 40, className }: Props) => {
       role="img"
       aria-label={token}
     >
-      <defs>
-        <radialGradient id={`${id}-face`} cx="38%" cy="32%" r="75%">
-          <stop offset="0%" stopColor={p.light} />
-          <stop offset="55%" stopColor={p.base} />
-          <stop offset="100%" stopColor={p.dark} />
-        </radialGradient>
-        <linearGradient id={`${id}-rim`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#fbe7a8" />
-          <stop offset="50%" stopColor="#b8873a" />
-          <stop offset="100%" stopColor="#6b4a17" />
-        </linearGradient>
-      </defs>
-      <circle cx="50" cy="53" r="46" fill="#000" opacity="0.35" />
-      {isSeal ? (
+      {token === 'seal' ? (
         <path
           d="M50 4 C64 4 72 10 80 16 C90 24 96 36 95 50 C96 64 88 76 80 84 C70 92 60 96 50 95 C36 96 26 90 18 82 C8 72 4 62 5 50 C4 36 10 24 20 16 C28 9 38 4 50 4 Z"
-          fill={`url(#${id}-face)`}
+          fill={p.base}
+          stroke={p.ring}
+          strokeWidth="3"
         />
       ) : (
-        <>
-          <circle cx="50" cy="50" r="46" fill={`url(#${id}-rim)`} />
-          <circle cx="50" cy="50" r="39" fill={`url(#${id}-face)`} />
-          <circle
-            cx="50"
-            cy="50"
-            r="39"
-            fill="none"
-            stroke="#000"
-            strokeOpacity="0.25"
-            strokeWidth="1.5"
-          />
-        </>
+        <circle cx="50" cy="50" r="46" fill={p.base} stroke={p.ring} strokeWidth="3" />
       )}
-      {GLYPHS[token](p.glyph)}
-      <ellipse
-        cx="36"
-        cy="28"
-        rx="16"
-        ry="8"
-        fill="#fff"
-        opacity="0.28"
-        transform="rotate(-25 36 28)"
+      <circle
+        cx="50"
+        cy="50"
+        r="38"
+        fill="none"
+        stroke={p.glyph}
+        strokeOpacity="0.35"
+        strokeWidth="1.5"
       />
+      {GLYPHS[token](p.glyph)}
     </svg>
   );
 };

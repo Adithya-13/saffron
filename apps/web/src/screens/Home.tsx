@@ -3,7 +3,6 @@ import type { FormEvent } from 'react';
 import { GAME_NAME } from '@saffron/content';
 import { MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@saffron/protocol';
 import { navigate } from '../App.tsx';
-import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { createRoom } from '../net/socket.ts';
 import { loadName, saveName } from '../net/storage.ts';
 import { RulesSheet } from '../components/RulesSheet.tsx';
@@ -40,17 +39,12 @@ export const Home = () => {
 
   return (
     <main className="home">
-      <div className="home__hero" />
+      <img className="home__hero" src="/assets/misc/hero.webp" alt="" />
       <section className="home__panel">
-        <div className="home__tokens" aria-hidden>
-          {(['saffron', 'cardamom', 'sumac', 'pepper', 'salt'] as const).map((t, i) => (
-            <SpiceIcon key={t} token={t} size={34} className={`home__token home__token--${i}`} />
-          ))}
-        </div>
         <h1 className="home__title">{GAME_NAME}</h1>
         <p className="home__tagline">
-          Trade spices by lantern light, grow your caravans into fleets, and win the favour of the
-          guilds. 2 to 4 merchants, about 30 minutes.
+          A game of spice trading for 2 to 4 merchants. Build stalls into caravans and fleets, and
+          win the favour of the guilds. About 30 minutes.
         </p>
 
         <label className="field">
@@ -95,9 +89,11 @@ export const Home = () => {
         </form>
 
         {error && <p className="home__error">{error}</p>}
-        <button className="link-btn" type="button" onClick={() => setRulesOpen(true)}>
-          How to play
-        </button>
+        <div className="home__footer">
+          <button className="link-btn" type="button" onClick={() => setRulesOpen(true)}>
+            How to play
+          </button>
+        </div>
       </section>
       {rulesOpen && <RulesSheet onClose={() => setRulesOpen(false)} />}
     </main>

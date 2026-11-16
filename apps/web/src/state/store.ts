@@ -9,8 +9,37 @@ export type SyncMessage = Extract<ServerMessage, { type: 'sync' }>;
 export type Selection =
   | { readonly kind: 'market'; readonly tier: 1 | 2 | 3; readonly slot: number }
   | { readonly kind: 'deck'; readonly tier: 1 | 2 | 3 }
-  | { readonly kind: 'reserve'; readonly index: number }
+  | { readonly kind: 'reserve'; readonly playerId: string; readonly index: number }
   | null;
+
+const reservedKey = (view: PlayerView, playerId: string, index: number): string | null => {
+  const entry = view.players.find((p) => p.id === playerId)?.reserved[index];
+  return entry ? (entry.card?.id ?? `hidden-${entry.tier}`) : null;
+};
+
+const keepSelection = (
+  selection: Selection,
+  before: PlayerView | null,
+  after: PlayerView | null,
+): Selection => {
+  if (!selection || !before || !after) return null;
+  switch (selection.kind) {
+    case 'market': {
+      const was = before.market[selection.tier][selection.slot]?.id;
+      return was !== undefined && was === after.market[selection.tier][selection.slot]?.id
+        ? selection
+        : null;
+    }
+    case 'deck':
+      return after.deckCounts[selection.tier] > 0 ? selection : null;
+    case 'reserve': {
+      const was = reservedKey(before, selection.playerId, selection.index);
+      return was !== null && was === reservedKey(after, selection.playerId, selection.index)
+        ? selection
+        : null;
+    }
+  }
+};
 
 export type Toast = { readonly id: number; readonly text: string; readonly tone: 'info' | 'error' };
 
@@ -108,15 +137,16 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   commitSync: (message) => {
+    const before = get().view;
     const turnChanged =
-      get().view?.turn !== message.view?.turn ||
-      get().view?.phase.kind !== message.view?.phase.kind;
+      before?.turn !== message.view?.turn || before?.phase.kind !== message.view?.phase.kind;
     set({
       room: message.room,
       view: message.view,
       legal: message.legal,
       log: message.log,
-      ...(turnChanged ? { draft: [], selection: null } : {}),
+      selection: keepSelection(get().selection, before, message.view),
+      ...(turnChanged ? { draft: [] } : {}),
     });
   },
 

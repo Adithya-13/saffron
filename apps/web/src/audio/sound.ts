@@ -10,11 +10,9 @@ export const SFX = [
   'flip',
   'chime',
   'stamp',
-  'fanfare',
   'bell',
   'thunk',
   'pop',
-  'drum',
   'victory',
 ] as const;
 export type SfxName = (typeof SFX)[number];

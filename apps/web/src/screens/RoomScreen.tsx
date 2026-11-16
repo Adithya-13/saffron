@@ -55,7 +55,7 @@ const Connecting = ({ failed }: { failed: boolean }) => (
         </>
       ) : (
         <>
-          <div className="lantern-spinner" aria-hidden />
+          <div className="spinner" aria-hidden />
           <p>Walking to the stall...</p>
         </>
       )}

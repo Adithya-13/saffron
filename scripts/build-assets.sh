@@ -20,8 +20,7 @@ for file in "$SRC"/guilds/*.png; do
   to_webp "$file" "$OUT/guilds/$(basename "${file%.png}").webp" 360 80
 done
 
-to_webp "$SRC/misc/table.png" "$OUT/misc/table.webp" 1600 72
-to_webp "$SRC/misc/hero.png" "$OUT/misc/hero.webp" 2200 78
+to_webp "$SRC/misc/hero.png" "$OUT/misc/hero.webp" 1400 78
 
 encode_audio() {
   local input="$1" name="$2" loudness="$3" trim="$4"
