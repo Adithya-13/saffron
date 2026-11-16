@@ -10,6 +10,7 @@ import {
   runBotTurn,
   setConnected,
   syncFor,
+  upgradeRoom,
 } from './room.ts';
 import type { Ctx, Outcome, RoomState } from './room.ts';
 
@@ -42,6 +43,9 @@ const twoHumans = () => {
   return { room, a: a.seatId, b: b.seatId, tokenA: a.token };
 };
 
+const omit = <T extends object, K extends keyof T>(value: T, key: K): Omit<T, K> =>
+  Object.fromEntries(Object.entries(value).filter(([k]) => k !== key)) as Omit<T, K>;
+
 const errorOf = (outcome: Outcome) => outcome.replies.find((r) => r.type === 'error');
 
 describe('lobby', () => {
@@ -72,6 +76,49 @@ describe('lobby', () => {
       type: 'error',
       code: 'notEnoughPlayers',
     });
+  });
+
+  it('lets only the host pick the theme in the lobby', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const b = joinAs(a.room, 'Budi');
+    expect(b.room.theme).toBe('paper');
+    expect(errorOf(send(b.room, b.seatId, { type: 'setTheme', theme: 'night' }))).toEqual({
+      type: 'error',
+      code: 'notHost',
+    });
+    const themed = ok(send(b.room, a.seatId, { type: 'setTheme', theme: 'harbour' }));
+    const sync = syncFor(themed, a.seatId, []);
+    expect(sync.type === 'sync' ? sync.room.theme : null).toBe('harbour');
+  });
+
+  it('seats up to eight merchants and starts a scaled game', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const full = Array.from({ length: 7 }).reduce<RoomState>(
+      (room) => ok(send(room, a.seatId, { type: 'addBot' })),
+      a.room,
+    );
+    expect(full.seats).toHaveLength(8);
+    expect(new Set(full.seats.map((s) => s.name)).size).toBe(8);
+    expect(errorOf(send(full, a.seatId, { type: 'addBot' }))).toEqual({
+      type: 'error',
+      code: 'roomFull',
+    });
+    const started = ok(send(full, a.seatId, { type: 'start' }));
+    expect(started.game?.players).toHaveLength(8);
+    expect(started.game?.targetPoints).toBe(12);
+  });
+
+  it('upgrades rooms stored before themes and per-table targets', () => {
+    const { room } = twoHumans();
+    if (!room.game) throw new Error('no game');
+    const legacyGame = omit(room.game, 'targetPoints');
+    const upgraded = upgradeRoom({
+      ...omit(room, 'theme'),
+      game: legacyGame,
+      turnStart: legacyGame,
+    });
+    expect(upgraded.theme).toBe('paper');
+    expect(upgraded.game?.targetPoints).toBe(15);
   });
 
   it('turns late joiners into spectators once full or started', () => {

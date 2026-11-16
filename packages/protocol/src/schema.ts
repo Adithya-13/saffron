@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { SPICES, TOKENS } from '@saffron/engine';
 import type { Move } from '@saffron/engine';
-import { MAX_CHAT_LENGTH, MAX_NAME_LENGTH } from './index.ts';
+import { MAX_CHAT_LENGTH, MAX_NAME_LENGTH, THEMES } from './index.ts';
 import type { ClientMessage } from './index.ts';
 
 const spice = z.enum(SPICES);
@@ -43,6 +43,7 @@ export const clientMessageSchema: z.ZodType<ClientMessage> = z.discriminatedUnio
   z.object({ type: z.literal('start') }),
   z.object({ type: z.literal('addBot') }),
   z.object({ type: z.literal('removeSeat'), seatId: z.string().max(64) }),
+  z.object({ type: z.literal('setTheme'), theme: z.enum(THEMES) }),
   z.object({ type: z.literal('move'), move: moveSchema }),
   z.object({ type: z.literal('chat'), text: z.string().trim().min(1).max(MAX_CHAT_LENGTH) }),
   z.object({ type: z.literal('undoRequest') }),

@@ -4,11 +4,16 @@ export const MAX_NAME_LENGTH = 20;
 export const MAX_CHAT_LENGTH = 280;
 export const ROOM_CODE_LENGTH = 5;
 
+export const THEMES = ['paper', 'night', 'harbour'] as const;
+export type Theme = (typeof THEMES)[number];
+export const DEFAULT_THEME: Theme = 'paper';
+
 export type ClientMessage =
   | { readonly type: 'join'; readonly name: string; readonly token?: string | undefined }
   | { readonly type: 'start' }
   | { readonly type: 'addBot' }
   | { readonly type: 'removeSeat'; readonly seatId: string }
+  | { readonly type: 'setTheme'; readonly theme: Theme }
   | { readonly type: 'move'; readonly move: Move }
   | { readonly type: 'chat'; readonly text: string }
   | { readonly type: 'undoRequest' }
@@ -45,6 +50,7 @@ export type RoomSnapshot = {
   readonly code: string;
   readonly status: RoomStatus;
   readonly hostSeatId: string | null;
+  readonly theme: Theme;
   readonly seats: readonly SeatInfo[];
   readonly undoAvailableTo: string | null;
   readonly undoVote: UndoVoteInfo | null;

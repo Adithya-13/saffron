@@ -11,6 +11,7 @@ import {
   viewFor,
 } from '@saffron/engine';
 import type { GameEvent, GameState, Move, RngState } from '@saffron/engine';
+import { DEFAULT_THEME } from '@saffron/protocol';
 import type {
   ChatMessage,
   ClientMessage,
@@ -19,6 +20,7 @@ import type {
   RoomStatus,
   SeatInfo,
   ServerMessage,
+  Theme,
   UndoVoteInfo,
 } from '@saffron/protocol';
 
@@ -28,7 +30,15 @@ export const CHAT_COOLDOWN_MS = 600;
 const LOG_LIMIT = 300;
 const CHAT_LIMIT = 100;
 const SYSTEM_NAME = 'Bazaar';
-const BOT_NAMES = ['Zafira (bot)', 'Idris (bot)', 'Leyla (bot)', 'Tariq (bot)'] as const;
+const BOT_NAMES = [
+  'Zafira (bot)',
+  'Idris (bot)',
+  'Leyla (bot)',
+  'Tariq (bot)',
+  'Nadia (bot)',
+  'Omar (bot)',
+  'Samira (bot)',
+] as const;
 
 export type Seat = SeatInfo & { readonly token: string | null; readonly lastChatAt: number };
 
@@ -38,6 +48,7 @@ export type RoomState = {
   readonly code: string;
   readonly status: RoomStatus;
   readonly hostSeatId: string | null;
+  readonly theme: Theme;
   readonly seats: readonly Seat[];
   readonly game: GameState | null;
   readonly turnStart: GameState | null;
@@ -83,6 +94,7 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   code,
   status: 'lobby',
   hostSeatId: null,
+  theme: DEFAULT_THEME,
   seats: [],
   game: null,
   turnStart: null,
@@ -91,6 +103,32 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   log: [],
   chat: [],
   botRng: seedRng(seed),
+});
+
+const LEGACY_TARGET_POINTS = 15;
+
+type StoredGame = Omit<GameState, 'targetPoints'> & { readonly targetPoints?: number };
+export type StoredRoom = Omit<RoomState, 'theme' | 'game' | 'turnStart' | 'undoPoint'> & {
+  readonly theme?: Theme;
+  readonly game: StoredGame | null;
+  readonly turnStart: StoredGame | null;
+  readonly undoPoint: (Omit<UndoPoint, 'snapshot'> & { readonly snapshot: StoredGame }) | null;
+};
+
+const upgradeGame = (game: StoredGame): GameState => ({
+  ...game,
+  targetPoints: game.targetPoints ?? LEGACY_TARGET_POINTS,
+});
+
+export const upgradeRoom = (stored: StoredRoom): RoomState => ({
+  ...stored,
+  theme: stored.theme ?? DEFAULT_THEME,
+  game: stored.game && upgradeGame(stored.game),
+  turnStart: stored.turnStart && upgradeGame(stored.turnStart),
+  undoPoint: stored.undoPoint && {
+    ...stored.undoPoint,
+    snapshot: upgradeGame(stored.undoPoint.snapshot),
+  },
 });
 
 const systemChat = (ctx: Ctx, text: string): ChatMessage => ({
@@ -185,6 +223,12 @@ const removeSeat = (room: RoomState, senderId: string | null, seatId: string): O
   if (error) return failure(room, error);
   if (seatId === room.hostSeatId || !seatOf(room, seatId)) return failure(room, 'notSeated');
   return synced({ ...room, seats: room.seats.filter((s) => s.id !== seatId) });
+};
+
+const setTheme = (room: RoomState, senderId: string | null, theme: Theme): Outcome => {
+  const error = requireHostInLobby(room, senderId);
+  if (error) return failure(room, error);
+  return synced({ ...room, theme });
 };
 
 const start = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => {
@@ -357,6 +401,8 @@ export const handleMessage = (
       return addBot(room, senderId, ctx);
     case 'removeSeat':
       return removeSeat(room, senderId, msg.seatId);
+    case 'setTheme':
+      return setTheme(room, senderId, msg.theme);
     case 'move':
       return applyGameMove(room, senderId, msg.move);
     case 'chat':
@@ -398,6 +444,7 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   code: room.code,
   status: room.status,
   hostSeatId: room.hostSeatId,
+  theme: room.theme,
   seats: room.seats.map(({ id, name, kind, connected }) => ({ id, name, kind, connected })),
   undoAvailableTo: room.undoVote ? null : (room.undoPoint?.actorId ?? null),
   undoVote: room.undoVote,

@@ -9,8 +9,9 @@ import {
   runBotTurn,
   setConnected,
   syncFor,
+  upgradeRoom,
 } from './room.ts';
-import type { Ctx, Outcome, RoomState } from './room.ts';
+import type { Ctx, Outcome, RoomState, StoredRoom } from './room.ts';
 import { randomId, randomSeed } from './random.ts';
 
 type Attachment = { readonly seatId: string | null };
@@ -30,7 +31,8 @@ const send = (ws: WebSocket, message: ServerMessage): void => {
 
 export class Room extends DurableObject {
   private async load(): Promise<RoomState | undefined> {
-    return this.ctx.storage.get<RoomState>(ROOM_KEY);
+    const stored = await this.ctx.storage.get<StoredRoom>(ROOM_KEY);
+    return stored && upgradeRoom(stored);
   }
 
   private context(): Ctx {
