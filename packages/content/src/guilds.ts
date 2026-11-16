@@ -3,7 +3,7 @@ import type { Guild, Spice } from '@saffron/engine';
 
 const GUILD_POINTS = 3;
 const PAIR_REQUIREMENT = 4;
-const SPREAD_REQUIREMENT = 2;
+const TRIO_REQUIREMENT = 3;
 
 const PAIR_NAMES = [
   'Order of the Ember Thread',
@@ -13,7 +13,7 @@ const PAIR_NAMES = [
   'Company of the Green Tide',
 ] as const;
 
-const SPREAD_NAMES = [
+const TRIO_NAMES = [
   "Caravan Masters' Hall",
   'Lantern Keepers',
   'Moonlit Exchange',
@@ -38,14 +38,17 @@ const pairGuilds: Guild[] = PAIR_NAMES.map((name, i) => ({
   },
 }));
 
-const spreadGuilds: Guild[] = SPREAD_NAMES.map((name, i) => ({
-  id: `spread-no-${spiceAt(i)}`,
-  name,
-  points: GUILD_POINTS,
-  requires: {
-    ...(Object.fromEntries(SPICES.map((s) => [s, SPREAD_REQUIREMENT])) as Record<Spice, number>),
-    [spiceAt(i)]: 0,
-  },
-}));
+const trioGuilds: Guild[] = TRIO_NAMES.map((name, i) => {
+  const spices = [spiceAt(i), spiceAt(i + 1), spiceAt(i + 2)];
+  return {
+    id: `trio-${spices.join('-')}`,
+    name,
+    points: GUILD_POINTS,
+    requires: {
+      ...emptySpices(),
+      ...Object.fromEntries(spices.map((s) => [s, TRIO_REQUIREMENT])),
+    },
+  };
+});
 
-export const GUILDS: readonly Guild[] = [...pairGuilds, ...spreadGuilds];
+export const GUILDS: readonly Guild[] = [...pairGuilds, ...trioGuilds];
