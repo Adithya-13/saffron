@@ -4,10 +4,11 @@ import type { Card as CardData, PlayerPublic, Tier } from '@saffron/engine';
 import { TIER_INFO } from '@saffron/content';
 import { anchors } from '../anim/plan.ts';
 import { markBlindTipSeen } from '../net/storage.ts';
-import { canAfford } from '../state/selectors.ts';
+import { canAfford, withDraft } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import type { Selection } from '../state/store.ts';
 import { Card, CardBack, tierRoman } from './Card.tsx';
+import type { CardState } from './Card.tsx';
 
 export const sameSelection = (a: Selection, b: Selection): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
@@ -15,9 +16,26 @@ export const sameSelection = (a: Selection, b: Selection): boolean =>
 export const affordable = (me: PlayerPublic | null, card: CardData): boolean =>
   me !== null && canAfford(me, card);
 
+const stateOf = (
+  selected: boolean,
+  me: PlayerPublic | null,
+  preview: PlayerPublic | null,
+  card: CardData,
+): CardState => {
+  if (selected) return 'selected';
+  if (affordable(me, card)) return 'affordable';
+  return preview !== me && affordable(preview, card) ? 'reachable' : 'idle';
+};
+
+const usePreview = (me: PlayerPublic | null): PlayerPublic | null => {
+  const draft = useStore((s) => s.draft);
+  return me && withDraft(me, draft);
+};
+
 const ReserveRow = ({ me }: { readonly me: PlayerPublic }) => {
   const selection = useStore((s) => s.selection);
   const select = useStore((s) => s.select);
+  const preview = usePreview(me);
   if (me.reserved.length === 0) return null;
   return (
     <div
@@ -39,13 +57,7 @@ const ReserveRow = ({ me }: { readonly me: PlayerPublic }) => {
             {r.card ? (
               <Card
                 card={r.card}
-                state={
-                  sameSelection(selection, target)
-                    ? 'selected'
-                    : affordable(me, r.card)
-                      ? 'affordable'
-                      : 'idle'
-                }
+                state={stateOf(sameSelection(selection, target), me, preview, r.card)}
                 onClick={() => select(target)}
               />
             ) : (
@@ -69,6 +81,7 @@ export const Market = ({ me }: { readonly me: PlayerPublic | null }) => {
   const view = useStore((s) => s.view);
   const selection = useStore((s) => s.selection);
   const select = useStore((s) => s.select);
+  const preview = usePreview(me);
   if (!view) return null;
 
   return (
@@ -108,13 +121,7 @@ export const Market = ({ me }: { readonly me: PlayerPublic | null }) => {
                     >
                       <Card
                         card={card}
-                        state={
-                          sameSelection(selection, target)
-                            ? 'selected'
-                            : affordable(me, card)
-                              ? 'affordable'
-                              : 'idle'
-                        }
+                        state={stateOf(sameSelection(selection, target), me, preview, card)}
                         onClick={() => select(target)}
                       />
                     </motion.div>

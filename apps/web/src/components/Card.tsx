@@ -16,9 +16,11 @@ export const describeCard = (card: CardData): string => {
   return `${TIER_INFO[card.tier].label} card, ${card.points} points, gives ${SPICE_INFO[card.bonus].label}, costs ${costs}`;
 };
 
+export type CardState = 'affordable' | 'reachable' | 'selected' | 'idle';
+
 type CardProps = {
   readonly card: CardData;
-  readonly state?: 'affordable' | 'selected' | 'idle';
+  readonly state?: CardState;
   readonly onClick?: () => void;
   readonly label?: string;
 };
