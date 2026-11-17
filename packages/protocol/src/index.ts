@@ -34,6 +34,7 @@ export type SeatInfo = {
   readonly name: string;
   readonly kind: SeatKind;
   readonly connected: boolean;
+  readonly themeVote: Theme | null;
 };
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished';

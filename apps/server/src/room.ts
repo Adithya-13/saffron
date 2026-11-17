@@ -11,7 +11,7 @@ import {
   viewFor,
 } from '@saffron/engine';
 import type { GameEvent, GameState, Move, RngState } from '@saffron/engine';
-import { DEFAULT_THEME, TURN_MS } from '@saffron/protocol';
+import { DEFAULT_THEME, THEMES, TURN_MS } from '@saffron/protocol';
 import type {
   ChatMessage,
   ClientMessage,
@@ -126,9 +126,10 @@ const LEGACY_TARGET_POINTS = 15;
 type StoredGame = Omit<GameState, 'targetPoints'> & { readonly targetPoints?: number };
 export type StoredRoom = Omit<
   RoomState,
-  'theme' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
+  'theme' | 'seats' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
 > & {
   readonly theme?: Theme;
+  readonly seats: readonly (Omit<Seat, 'themeVote'> & { readonly themeVote?: Theme | null })[];
   readonly clock?: TurnClock | null;
   readonly autopilot?: readonly string[];
   readonly game: StoredGame | null;
@@ -144,6 +145,7 @@ const upgradeGame = (game: StoredGame): GameState => ({
 export const upgradeRoom = (stored: StoredRoom): RoomState => ({
   ...stored,
   theme: stored.theme ?? DEFAULT_THEME,
+  seats: stored.seats.map((s) => ({ ...s, themeVote: s.themeVote ?? null })),
   clock: stored.clock ?? null,
   autopilot: stored.autopilot ?? [],
   game: stored.game && upgradeGame(stored.game),
@@ -204,6 +206,7 @@ const join = (
     connected: true,
     token: ctx.randomId() + ctx.randomId(),
     lastChatAt: 0,
+    themeVote: null,
   };
   const joined: RoomState = {
     ...room,
@@ -237,6 +240,7 @@ const addBot = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => 
     connected: true,
     token: null,
     lastChatAt: 0,
+    themeVote: null,
   };
   return synced({ ...room, seats: [...room.seats, bot] });
 };
@@ -248,9 +252,25 @@ const hostAfter = (seats: readonly Seat[], hostSeatId: string | null): string | 
     ? hostSeatId
     : (seats.find((s) => s.kind === 'human')?.id ?? null);
 
+export const votedTheme = (room: RoomState): Theme => {
+  const tally = THEMES.map((theme) => ({
+    theme,
+    votes: room.seats.filter((s) => s.themeVote === theme).length,
+  }));
+  const top = Math.max(...tally.map((t) => t.votes));
+  if (top === 0) return room.theme;
+  const leaders = tally.filter((t) => t.votes === top).map((t) => t.theme);
+  const hostVote = seatOf(room, room.hostSeatId)?.themeVote;
+  if (hostVote && leaders.includes(hostVote)) return hostVote;
+  if (leaders.includes(room.theme)) return room.theme;
+  return leaders[0] ?? room.theme;
+};
+
+const withVotedTheme = (room: RoomState): RoomState => ({ ...room, theme: votedTheme(room) });
+
 const withoutSeat = (room: RoomState, seatId: string): RoomState => {
   const seats = room.seats.filter((s) => s.id !== seatId);
-  return { ...room, seats, hostSeatId: hostAfter(seats, room.hostSeatId) };
+  return withVotedTheme({ ...room, seats, hostSeatId: hostAfter(seats, room.hostSeatId) });
 };
 
 const handToBot = (room: RoomState, seatId: string, note: ChatMessage): Outcome => {
@@ -312,10 +332,12 @@ const leave = (room: RoomState, senderId: string, ctx: Ctx): Outcome => {
   return { ...handed, bind: null };
 };
 
-const setTheme = (room: RoomState, senderId: string | null, theme: Theme): Outcome => {
-  const error = requireHostInLobby(room, senderId);
-  if (error) return failure(room, error);
-  return synced({ ...room, theme });
+const voteTheme = (room: RoomState, senderId: string, theme: Theme): Outcome => {
+  const seat = seatOf(room, senderId);
+  if (!seat || seat.kind !== 'human') return failure(room, 'notSeated');
+  if (room.status !== 'lobby') return failure(room, 'notInLobby');
+  const seats = room.seats.map((s) => (s.id === senderId ? { ...s, themeVote: theme } : s));
+  return synced(withVotedTheme({ ...room, seats }));
 };
 
 const start = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => {
@@ -542,7 +564,7 @@ const route = (room: RoomState, senderId: string | null, msg: ClientMessage, ctx
     case 'removeSeat':
       return removeSeat(room, senderId, msg.seatId, ctx);
     case 'setTheme':
-      return setTheme(room, senderId, msg.theme);
+      return voteTheme(room, senderId, msg.theme);
     case 'move':
       return playerMove(room, senderId, msg.move);
     case 'stillHere':
@@ -613,7 +635,13 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   status: room.status,
   hostSeatId: room.hostSeatId,
   theme: room.theme,
-  seats: room.seats.map(({ id, name, kind, connected }) => ({ id, name, kind, connected })),
+  seats: room.seats.map(({ id, name, kind, connected, themeVote }) => ({
+    id,
+    name,
+    kind,
+    connected,
+    themeVote,
+  })),
   undoAvailableTo: room.undoVote ? null : (room.undoPoint?.actorId ?? null),
   undoVote: room.undoVote,
   turnDeadline: room.clock?.deadline ?? null,

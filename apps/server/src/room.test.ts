@@ -83,17 +83,35 @@ describe('lobby', () => {
     });
   });
 
-  it('lets only the host pick the theme in the lobby', () => {
+  it('picks the theme with the most votes, host breaking ties', () => {
     const a = joinAs(createRoom('ABCDE', 1), 'Ana');
     const b = joinAs(a.room, 'Budi');
-    expect(b.room.theme).toBe('paper');
-    expect(errorOf(send(b.room, b.seatId, { type: 'setTheme', theme: 'night' }))).toEqual({
+    const c = joinAs(b.room, 'Citra');
+    expect(c.room.theme).toBe('paper');
+    const vote = (room: RoomState, seat: string, theme: 'paper' | 'night' | 'harbour') =>
+      ok(send(room, seat, { type: 'setTheme', theme }));
+    const budiNight = vote(c.room, b.seatId, 'night');
+    expect(budiNight.theme).toBe('night');
+    const anaHarbour = vote(budiNight, a.seatId, 'harbour');
+    expect(anaHarbour.theme).toBe('harbour');
+    const citraNight = vote(anaHarbour, c.seatId, 'night');
+    expect(citraNight.theme).toBe('night');
+    const sync = syncFor(citraNight, a.seatId, [], 0);
+    expect(sync.type === 'sync' ? sync.room.seats.map((s) => s.themeVote) : null).toEqual([
+      'harbour',
+      'night',
+      'night',
+    ]);
+    const citraGone = ok(send(citraNight, c.seatId, { type: 'leave' }));
+    expect(citraGone.theme).toBe('harbour');
+  });
+
+  it('only takes theme votes in the lobby', () => {
+    const { room, b } = twoHumans();
+    expect(errorOf(send(room, b, { type: 'setTheme', theme: 'night' }))).toEqual({
       type: 'error',
-      code: 'notHost',
+      code: 'notInLobby',
     });
-    const themed = ok(send(b.room, a.seatId, { type: 'setTheme', theme: 'harbour' }));
-    const sync = syncFor(themed, a.seatId, [], 0);
-    expect(sync.type === 'sync' ? sync.room.theme : null).toBe('harbour');
   });
 
   it('seats up to eight merchants and starts a scaled game', () => {

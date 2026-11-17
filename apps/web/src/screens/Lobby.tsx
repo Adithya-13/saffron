@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { GAME_NAME } from '@saffron/content';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@saffron/engine';
 import { THEMES } from '@saffron/protocol';
-import type { Theme } from '@saffron/protocol';
+import type { SeatInfo, Theme } from '@saffron/protocol';
 import { navigate } from '../App.tsx';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
@@ -21,27 +21,46 @@ const SWATCHES: Readonly<Record<Theme, readonly string[]>> = {
   harbour: ['#e8edef', '#1b2830', '#2c6d66'],
 };
 
-const ThemePicker = ({ theme, isHost }: { readonly theme: Theme; readonly isHost: boolean }) => (
+type PickerProps = {
+  readonly theme: Theme;
+  readonly seats: readonly SeatInfo[];
+  readonly myVote: Theme | null;
+  readonly canVote: boolean;
+};
+
+const votesLabel = (count: number): string => (count === 1 ? '1 vote' : `${count} votes`);
+
+const ThemePicker = ({ theme, seats, myVote, canVote }: PickerProps) => (
   <fieldset className="theme-pick">
-    <legend>{isHost ? 'Table look' : 'Table look, picked by the host'}</legend>
-    {THEMES.map((t) => (
-      <label key={t} className="theme-pick__option">
-        <input
-          type="radio"
-          name="theme"
-          value={t}
-          checked={theme === t}
-          disabled={!isHost}
-          onChange={() => send({ type: 'setTheme', theme: t })}
-        />
-        <span className="theme-pick__swatch" aria-hidden>
-          {SWATCHES[t].map((c) => (
-            <span key={c} style={{ background: c }} />
-          ))}
-        </span>
-        {THEME_INFO[t].label}
-      </label>
-    ))}
+    <legend>Table look, most votes wins</legend>
+    {THEMES.map((t) => {
+      const votes = seats.filter((s) => s.themeVote === t).length;
+      return (
+        <label
+          key={t}
+          className={`theme-pick__option${theme === t ? ' theme-pick__option--winning' : ''}`}
+        >
+          <input
+            type="radio"
+            name="theme"
+            value={t}
+            checked={myVote === t}
+            disabled={!canVote}
+            onChange={() => send({ type: 'setTheme', theme: t })}
+          />
+          <span className="theme-pick__swatch" aria-hidden>
+            {SWATCHES[t].map((c) => (
+              <span key={c} style={{ background: c }} />
+            ))}
+          </span>
+          {THEME_INFO[t].label}
+          <span className="theme-pick__votes">
+            {votesLabel(votes)}
+            {myVote === t && ' · yours'}
+          </span>
+        </label>
+      );
+    })}
   </fieldset>
 );
 
@@ -53,6 +72,7 @@ export const Lobby = () => {
   if (!room) return null;
 
   const isHost = seatId !== null && seatId === room.hostSeatId;
+  const mySeat = room.seats.find((s) => s.id === seatId);
   const canStart = isHost && room.seats.length >= MIN_PLAYERS;
   const openSeats = MAX_PLAYERS - room.seats.length;
 
@@ -83,7 +103,12 @@ export const Lobby = () => {
           </button>
         </div>
 
-        <ThemePicker theme={room.theme} isHost={isHost} />
+        <ThemePicker
+          theme={room.theme}
+          seats={room.seats}
+          myVote={mySeat?.themeVote ?? null}
+          canVote={mySeat?.kind === 'human'}
+        />
 
         <ul className={`seats${room.seats.length > 4 ? ' seats--many' : ''}`}>
           <AnimatePresence initial={false}>

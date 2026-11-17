@@ -194,7 +194,7 @@ test('host fills eight seats and picks a theme', async ({ browser }) => {
   for (let i = 0; i < 7; i++) await host.getByRole('button', { name: 'Add a bot' }).click();
   await expect(host.locator('.seats .seat:not(.seat--open)')).toHaveCount(8);
   await expect(host.getByRole('button', { name: 'Add a bot' })).toBeDisabled();
-  await host.getByText('Night', { exact: true }).click();
+  await host.locator('.theme-pick__option', { hasText: 'Night' }).click();
   await expect(host.locator('html')).toHaveAttribute('data-theme', 'night');
   await shot(host, '10-lobby-eight-night');
   await host.getByRole('button', { name: 'Open the market' }).click();
@@ -273,6 +273,10 @@ test('a guest leaves the lobby and the host closes the room', async ({ browser }
   await budi.getByRole('button', { name: 'Enter' }).click();
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
 
+  await budi.locator('.theme-pick__option', { hasText: 'Harbour' }).click();
+  await expect(ana.locator('html')).toHaveAttribute('data-theme', 'harbour');
+  await expect(budi.locator('.theme-pick__option--winning')).toContainText('1 vote · yours');
+  await shot(budi, '12-theme-vote');
   await budi.getByRole('button', { name: 'Leave room' }).click();
   await expect(budi).toHaveURL(/\/$/);
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeHidden();
