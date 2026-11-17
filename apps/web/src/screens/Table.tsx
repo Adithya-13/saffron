@@ -10,11 +10,13 @@ import { ChatBubble } from '../components/ChatBubble.tsx';
 import { ChatPanel } from '../components/ChatPanel.tsx';
 import { Dock } from '../components/Dock.tsx';
 import { EndScreen } from '../components/EndScreen.tsx';
+import { FirstTurn } from '../components/FirstTurn.tsx';
 import { GuildDetail, GuildStrip, guildArt } from '../components/Guilds.tsx';
 import { LogPanel } from '../components/LogPanel.tsx';
 import { Market } from '../components/Market.tsx';
 import { MenuSheet } from '../components/MenuSheet.tsx';
 import { PlayerDetail, Players } from '../components/Opponents.tsx';
+import { PauseScreen } from '../components/PauseScreen.tsx';
 import { PhaseSheets } from '../components/PhaseSheets.tsx';
 import { PlayersTable } from '../components/PlayersTable.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
@@ -36,6 +38,11 @@ type Panel =
 const END_SCREEN_DELAY_MS = 500;
 const LOW_TIME_MS = 10_000;
 
+const isFreshGame = (): boolean => {
+  const { view, log } = useStore.getState();
+  return view !== null && view.turn === 1 && !view.finished && log.length === 0;
+};
+
 const preload = (urls: readonly string[]): void => {
   for (const url of urls) {
     const img = new Image();
@@ -53,6 +60,7 @@ export const Table = () => {
   const flightsActive = useAnim((s) => s.flights.length > 0);
   const finished = view?.finished ?? false;
   const [showEnd, setShowEnd] = useState(false);
+  const [intro, setIntro] = useState(isFreshGame);
   const guildIds = view?.guilds.map((g) => g.id).join(',') ?? '';
   const remaining = useTurnRemaining();
   const myTurn = isMyTurn(view, seatId);
@@ -97,7 +105,7 @@ export const Table = () => {
     <div className="table">
       <header className="topbar">
         <span className="topbar__status">
-          {current && !view.finished && (
+          {current && !view.finished && !intro && (
             <span className={`topbar__turn${myTurn ? ' topbar__turn--mine' : ''}`}>
               {myTurn ? 'Your turn' : `${nameOf(room, current.id)}'s turn`}
             </span>
@@ -189,7 +197,14 @@ export const Table = () => {
       {panel?.kind === 'compare' && <PlayersTable onClose={close} />}
       {panel?.kind === 'player' && <PlayerDetail playerId={panel.id} onClose={close} />}
       {panel?.kind === 'guild' && <GuildDetail guildId={panel.id} onClose={close} />}
+      {room.pausedAt !== null && !view.finished && (
+        <PauseScreen
+          onChat={() => setPanel({ kind: 'chat' })}
+          onMenu={() => setPanel({ kind: 'menu' })}
+        />
+      )}
       {showEnd && <EndScreen />}
+      {intro && <FirstTurn onDone={() => setIntro(false)} />}
     </div>
   );
 };

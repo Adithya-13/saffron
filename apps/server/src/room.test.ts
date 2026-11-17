@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { START_INTRO_MS } from '@saffron/protocol';
 import type { ClientMessage } from '@saffron/protocol';
 import {
   DISCONNECT_GRACE_MS,
@@ -181,6 +182,92 @@ const watchAs = (
   return { room: outcome.room, viewerId: welcome.viewerId, token: welcome.token };
 };
 
+describe('opening', () => {
+  const seatedRoom = (count: number): { room: RoomState; ids: string[] } => {
+    let room = createRoom('ABCDE', 1);
+    const ids: string[] = [];
+    for (const name of ['Ana', 'Budi', 'Citra', 'Dewi'].slice(0, count)) {
+      const joined = joinAs(room, name);
+      room = joined.room;
+      ids.push(joined.seatId);
+    }
+    return { room, ids };
+  };
+
+  it('picks the first merchant from the seed and keeps seat order around the table', () => {
+    const { room, ids } = seatedRoom(4);
+    const started = handleMessage(
+      room,
+      ids[0] ?? null,
+      { type: 'start' },
+      {
+        now: 1_000,
+        seed: 6,
+        randomId: () => `x${++counter}`,
+      },
+    ).room;
+    expect(started.game?.players.map((p) => p.id)).toEqual([ids[2], ids[3], ids[0], ids[1]]);
+    expect(started.chat.at(-1)?.text).toBe('The market opens. Citra goes first');
+  });
+
+  it('holds a bot opener until the intro has played', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const withBot = ok(send(a.room, a.seatId, { type: 'addBot' }));
+    const started = handleMessage(
+      withBot,
+      a.seatId,
+      { type: 'start' },
+      {
+        now: 1_000,
+        seed: 1,
+        randomId: () => `y${++counter}`,
+      },
+    ).room;
+    expect(isAutoTurn(started)).toBe(true);
+    expect(nextWakeAt(started, 1_000)).toBe(1_000 + START_INTRO_MS);
+    expect(tick(started, ctx(1_000 + START_INTRO_MS - 1))).toBeNull();
+    expect(tick(started, ctx(1_000 + START_INTRO_MS))?.events.length).toBeGreaterThan(0);
+  });
+});
+
+describe('pause', () => {
+  const salt = { type: 'move', move: { type: 'takeDouble', spice: 'salt' } } as const;
+
+  it('lets only the host pause, and freezes moves, bots and the clock', () => {
+    const { room, a, b } = twoHumans();
+    expect(errorOf(send(room, b, { type: 'setPaused', paused: true }))).toEqual({
+      type: 'error',
+      code: 'notHost',
+    });
+    const paused = ok(send(room, a, { type: 'setPaused', paused: true }, 10_000));
+    expect(paused.pausedAt).toBe(10_000);
+    expect(paused.chat.at(-1)?.text).toBe('Ana paused the game');
+    expect(errorOf(send(paused, a, salt, 11_000))).toEqual({ type: 'error', code: 'paused' });
+    expect(nextWakeAt(paused, 11_000)).toBeNull();
+    expect(tick(paused, ctx((paused.clock?.deadline ?? 0) + 1))).toBeNull();
+    expect(send(paused, b, { type: 'chat', text: 'brb' }, 12_000).chat).toHaveLength(1);
+  });
+
+  it('gives back the frozen time on resume', () => {
+    const { room, a } = twoHumans();
+    const deadline = room.clock?.deadline ?? 0;
+    const paused = ok(send(room, a, { type: 'setPaused', paused: true }, 10_000));
+    const resumed = ok(send(paused, a, { type: 'setPaused', paused: false }, 70_000));
+    expect(resumed.pausedAt).toBeNull();
+    expect(resumed.clock?.deadline).toBe(deadline + 60_000);
+    expect(resumed.chat.at(-1)?.text).toBe('Ana resumed the game');
+    expect(errorOf(send(resumed, a, salt, 71_000))).toBeUndefined();
+  });
+
+  it('only pauses a game in progress', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    expect(errorOf(send(a.room, a.seatId, { type: 'setPaused', paused: true }))).toEqual({
+      type: 'error',
+      code: 'notPlaying',
+    });
+  });
+});
+
 describe('viewers', () => {
   it('lets someone watch the lobby without taking a seat', () => {
     const a = joinAs(createRoom('ABCDE', 1), 'Ana');
@@ -358,7 +445,11 @@ const salt = { type: 'move', move: { type: 'takeDouble', spice: 'salt' } } as co
 describe('turn clock', () => {
   it('starts a clock for each human turn', () => {
     const { room, a, b } = twoHumans();
-    expect(room.clock).toMatchObject({ seatId: a, deadline: 1_000 + TURN_MS, extended: false });
+    expect(room.clock).toMatchObject({
+      seatId: a,
+      deadline: 1_000 + START_INTRO_MS + TURN_MS,
+      extended: false,
+    });
     const moved = ok(send(room, a, salt, 5_000));
     expect(moved.clock).toMatchObject({ seatId: b, deadline: 5_000 + TURN_MS });
     const chatted = send(moved, a, { type: 'chat', text: 'hi' }, 9_000).room;

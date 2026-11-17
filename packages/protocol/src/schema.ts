@@ -42,6 +42,7 @@ export const clientMessageSchema: z.ZodType<ClientMessage> = z.discriminatedUnio
     watch: z.boolean().optional(),
   }),
   z.object({ type: z.literal('takeSeat') }),
+  z.object({ type: z.literal('setPaused'), paused: z.boolean() }),
   z.object({ type: z.literal('start') }),
   z.object({ type: z.literal('addBot') }),
   z.object({ type: z.literal('removeSeat'), seatId: z.string().max(64) }),

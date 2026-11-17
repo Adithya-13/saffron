@@ -8,15 +8,18 @@ export const remainingMs = (deadline: number, serverOffset: number, now: number)
 
 export const useTurnRemaining = (): number | null => {
   const deadline = useStore((s) => s.room?.turnDeadline ?? null);
+  const pausedAt = useStore((s) => s.room?.pausedAt ?? null);
   const serverOffset = useStore((s) => s.serverOffset);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (deadline === null) return;
+    if (deadline === null || pausedAt !== null) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(timer);
-  }, [deadline]);
+  }, [deadline, pausedAt]);
 
-  return deadline === null ? null : remainingMs(deadline, serverOffset, now);
+  if (deadline === null) return null;
+  if (pausedAt !== null) return Math.max(deadline - pausedAt, 0);
+  return remainingMs(deadline, serverOffset, now);
 };

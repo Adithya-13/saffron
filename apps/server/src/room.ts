@@ -11,7 +11,8 @@ import {
   viewFor,
 } from '@saffron/engine';
 import type { GameEvent, GameState, Move, RngState } from '@saffron/engine';
-import { DEFAULT_THEME, MAX_VIEWERS, THEMES, TURN_MS } from '@saffron/protocol';
+import type { RoomInfo } from './preview.ts';
+import { DEFAULT_THEME, MAX_VIEWERS, START_INTRO_MS, THEMES, TURN_MS } from '@saffron/protocol';
 import type {
   ChatMessage,
   ClientMessage,
@@ -77,6 +78,8 @@ export type RoomState = {
   readonly botRng: RngState;
   readonly clock: TurnClock | null;
   readonly autopilot: readonly string[];
+  readonly introUntil: number;
+  readonly pausedAt: number | null;
 };
 
 export type Ctx = { readonly now: number; readonly randomId: () => string; readonly seed: number };
@@ -128,6 +131,8 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   botRng: seedRng(seed),
   clock: null,
   autopilot: [],
+  introUntil: 0,
+  pausedAt: null,
 });
 
 const LEGACY_TARGET_POINTS = 15;
@@ -135,8 +140,19 @@ const LEGACY_TARGET_POINTS = 15;
 type StoredGame = Omit<GameState, 'targetPoints'> & { readonly targetPoints?: number };
 export type StoredRoom = Omit<
   RoomState,
-  'theme' | 'seats' | 'viewers' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
+  | 'theme'
+  | 'seats'
+  | 'viewers'
+  | 'game'
+  | 'turnStart'
+  | 'undoPoint'
+  | 'clock'
+  | 'autopilot'
+  | 'introUntil'
+  | 'pausedAt'
 > & {
+  readonly introUntil?: number;
+  readonly pausedAt?: number | null;
   readonly theme?: Theme;
   readonly viewers?: readonly Viewer[];
   readonly seats: readonly (Omit<Seat, 'themeVote'> & { readonly themeVote?: Theme | null })[];
@@ -159,6 +175,8 @@ export const upgradeRoom = (stored: StoredRoom): RoomState => ({
   viewers: stored.viewers ?? [],
   clock: stored.clock ?? null,
   autopilot: stored.autopilot ?? [],
+  introUntil: stored.introUntil ?? 0,
+  pausedAt: stored.pausedAt ?? null,
   game: stored.game && upgradeGame(stored.game),
   turnStart: stored.turnStart && upgradeGame(stored.turnStart),
   undoPoint: stored.undoPoint && {
@@ -432,17 +450,18 @@ const start = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => {
   const error = requireHostInLobby(room, senderId);
   if (error) return failure(room, error);
   if (room.seats.length < MIN_PLAYERS) return failure(room, 'notEnoughPlayers');
-  const game = createGame(
-    CATALOG,
-    room.seats.map((s) => s.id),
-    ctx.seed,
-  );
-  const note = systemChat(ctx, 'The market opens. Good trading!');
+  const ids = room.seats.map((s) => s.id);
+  const first = ctx.seed % ids.length;
+  const game = createGame(CATALOG, [...ids.slice(first), ...ids.slice(0, first)], ctx.seed);
+  const opener = game.players[0]?.id ?? '';
+  const note = systemChat(ctx, `The market opens. ${nameOf(room, opener)} goes first`);
   return synced(
     withChat(
       {
         ...room,
         status: 'playing',
+        introUntil: ctx.now + START_INTRO_MS,
+        pausedAt: null,
         game,
         turnStart: game,
         undoPoint: null,
@@ -469,9 +488,32 @@ const rematch = (room: RoomState, senderId: string | null): Outcome => {
   });
 };
 
+const setPaused = (room: RoomState, senderId: string, paused: boolean, ctx: Ctx): Outcome => {
+  if (senderId !== room.hostSeatId) return failure(room, 'notHost');
+  if (room.status !== 'playing') return failure(room, 'notPlaying');
+  const pausedAt = room.pausedAt;
+  if (paused === (pausedAt !== null)) return unchanged(room);
+  const host = nameOf(room, senderId);
+  if (paused) {
+    const note = systemChat(ctx, `${host} paused the game`);
+    return synced(withChat({ ...room, pausedAt: ctx.now }, [note]), { chat: [note] });
+  }
+  const held = ctx.now - (pausedAt ?? ctx.now);
+  const note = systemChat(ctx, `${host} resumed the game`);
+  const resumed: RoomState = {
+    ...room,
+    pausedAt: null,
+    introUntil: room.introUntil > (pausedAt ?? 0) ? room.introUntil + held : room.introUntil,
+    clock: room.clock && { ...room.clock, deadline: room.clock.deadline + held },
+    undoVote: room.undoVote && { ...room.undoVote, expiresAt: room.undoVote.expiresAt + held },
+  };
+  return synced(withChat(resumed, [note]), { chat: [note] });
+};
+
 const applyGameMove = (room: RoomState, actorId: string, move: Move): Outcome => {
   const game = room.game;
   if (!game || room.status !== 'playing') return failure(room, 'notPlaying');
+  if (room.pausedAt !== null) return failure(room, 'paused');
   if (room.undoVote) return failure(room, 'undoPending');
   const result = applyMove(game, actorId, move);
   if (!result.ok) return failure(room, result.error);
@@ -526,6 +568,7 @@ const performUndo = (room: RoomState, ctx: Ctx): Outcome => {
 
 const requestUndo = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => {
   if (room.status !== 'playing') return failure(room, 'notPlaying');
+  if (room.pausedAt !== null) return failure(room, 'paused');
   if (room.undoVote) return failure(room, 'undoPending');
   if (!room.undoPoint || room.undoPoint.actorId !== senderId)
     return failure(room, 'undoUnavailable');
@@ -556,6 +599,7 @@ const voteUndo = (
   ctx: Ctx,
 ): Outcome => {
   const vote = room.undoVote;
+  if (room.pausedAt !== null) return failure(room, 'paused');
   if (!vote || senderId === null || !vote.voters.includes(senderId)) {
     return failure(room, 'undoUnavailable');
   }
@@ -599,6 +643,7 @@ const offAutopilot = (room: RoomState, seatId: string): RoomState =>
     : room;
 
 export const withClock = (room: RoomState, now: number): RoomState => {
+  if (room.pausedAt !== null) return room;
   const game = room.game;
   const seat = seatOf(room, currentSeatId(room));
   if (!game || room.status !== 'playing' || room.undoVote || !seat || isAutoSeat(room, seat)) {
@@ -608,7 +653,12 @@ export const withClock = (room: RoomState, now: number): RoomState => {
   const kept: TurnClock =
     current && current.seatId === seat.id && current.turn === game.turn
       ? current
-      : { seatId: seat.id, turn: game.turn, deadline: now + TURN_MS, extended: false };
+      : {
+          seatId: seat.id,
+          turn: game.turn,
+          deadline: Math.max(now, room.introUntil) + TURN_MS,
+          extended: false,
+        };
   const deadline = seat.connected
     ? kept.deadline
     : Math.min(kept.deadline, now + DISCONNECT_GRACE_MS);
@@ -663,6 +713,8 @@ const route = (room: RoomState, senderId: string | null, msg: ClientMessage, ctx
       return stillHere(room, senderId);
     case 'resume':
       return resume(room, senderId);
+    case 'setPaused':
+      return setPaused(room, senderId, msg.paused, ctx);
     case 'takeSeat':
       return takeSeat(room, senderId, ctx);
     case 'leave':
@@ -708,7 +760,11 @@ export const expireClock = (room: RoomState, ctx: Ctx): Outcome | null => {
 };
 
 export const tick = (room: RoomState, ctx: Ctx): Outcome | null => {
-  const outcome = expireUndo(room, ctx) ?? expireClock(room, ctx) ?? runBotTurn(room);
+  if (room.pausedAt !== null) return null;
+  const outcome =
+    expireUndo(room, ctx) ??
+    expireClock(room, ctx) ??
+    (ctx.now >= room.introUntil ? runBotTurn(room) : null);
   return outcome && clocked(outcome, ctx.now);
 };
 
@@ -716,13 +772,20 @@ export const disconnect = (room: RoomState, memberId: string, now: number): Outc
   synced(withClock(setConnected(room, memberId, false), now));
 
 export const nextWakeAt = (room: RoomState, now: number): number | null => {
+  if (room.pausedAt !== null) return null;
   const wakes = [
     room.undoVote?.expiresAt,
     room.clock?.deadline,
-    isAutoTurn(room) ? now + BOT_DELAY_MS : undefined,
+    isAutoTurn(room) ? Math.max(now + BOT_DELAY_MS, room.introUntil) : undefined,
   ].filter((t): t is number => t !== undefined);
   return wakes.length > 0 ? Math.min(...wakes) : null;
 };
+
+export const roomInfo = (room: RoomState): RoomInfo => ({
+  host: seatOf(room, room.hostSeatId)?.name ?? null,
+  seats: room.seats.length,
+  status: room.status,
+});
 
 export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   code: room.code,
@@ -741,6 +804,7 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   undoVote: room.undoVote,
   turnDeadline: room.clock?.deadline ?? null,
   turnExtended: room.clock?.extended ?? false,
+  pausedAt: room.pausedAt,
   autopilot: room.autopilot,
 });
 

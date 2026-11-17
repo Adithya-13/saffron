@@ -6,6 +6,7 @@ import {
   disconnect,
   handleMessage,
   nextWakeAt,
+  roomInfo,
   syncFor,
   tick,
   upgradeRoom,
@@ -50,6 +51,7 @@ export class Room extends DurableObject {
     }
 
     if (!existing) return new Response('Room not found', { status: 404 });
+    if (url.pathname.endsWith('/info')) return Response.json(roomInfo(existing));
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected websocket', { status: 426 });
     }

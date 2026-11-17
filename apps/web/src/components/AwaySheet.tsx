@@ -9,7 +9,7 @@ export const AwaySheet = ({ myTurn, remaining }: Props) => {
   const seatId = useStore((s) => s.seatId);
   const room = useStore((s) => s.room);
   const finished = useStore((s) => s.view?.finished ?? true);
-  if (!room || !seatId || finished) return null;
+  if (!room || !seatId || finished || room.pausedAt !== null) return null;
 
   if (room.autopilot.includes(seatId)) {
     return (

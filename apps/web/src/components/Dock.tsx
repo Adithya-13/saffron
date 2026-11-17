@@ -5,6 +5,7 @@ import type { Move, PlayerPublic } from '@saffron/engine';
 import { anchors } from '../anim/plan.ts';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { send } from '../net/socket.ts';
+import { blindTipSeen } from '../net/storage.ts';
 import { draftToMove, isLegal } from '../state/moves.ts';
 import { currentOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
@@ -43,7 +44,7 @@ const Holdings = ({ me }: { readonly me: PlayerPublic }) => {
   );
 };
 
-const Action = ({ myTurn }: { readonly myTurn: boolean }) => {
+const Action = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTurn: boolean }) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
@@ -108,7 +109,21 @@ const Action = ({ myTurn }: { readonly myTurn: boolean }) => {
       </>
     );
   }
-  return <p className="dock__hint dock__hint--strong">Your turn.</p>;
+  if (!blindTipSeen() && me.reserved.length === 0 && me.cards.length < 4) {
+    return (
+      <p className="dock__hint dock__hint--strong">
+        Your turn. Tip: tap a deck <span className="dock__deck-chip">III</span> to reserve a hidden
+        card and a Seal.
+      </p>
+    );
+  }
+  return (
+    <p className="dock__hint dock__hint--strong">
+      {me.reserved.length > 0
+        ? 'Your turn. Tap spices or any card.'
+        : 'Your turn. Tap spices to take, or a card to buy.'}
+    </p>
+  );
 };
 
 const useDockHeight = () => {
@@ -147,7 +162,7 @@ export const Dock = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTur
         <Holdings me={me} />
       </div>
       <div className="dock__row">
-        <Action myTurn={myTurn} />
+        <Action me={me} myTurn={myTurn} />
       </div>
     </footer>
   );

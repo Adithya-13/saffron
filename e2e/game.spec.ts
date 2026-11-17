@@ -24,6 +24,14 @@ const takeSpices = async (page: Page, labels: readonly string[]): Promise<void> 
 const waitForMyTurn = (page: Page) =>
   expect(page.locator('.topbar__turn')).toHaveText('Your turn', { timeout: 15_000 });
 
+const hostOpens = async (host: Page, guest: Page): Promise<void> => {
+  await expect(guest.locator('.topbar__turn')).toHaveText(/turn/, { timeout: 15_000 });
+  if ((await guest.locator('.topbar__turn').textContent()) === 'Your turn') {
+    await takeSpices(guest, ['Saffron', 'Cardamom', 'Salt']);
+  }
+  await waitForMyTurn(host);
+};
+
 test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   const ana = await newPlayer(browser, { width: 1280, height: 860 });
   await ana.goto('/');
@@ -41,8 +49,10 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
   await shot(ana, '02-lobby');
   await ana.getByRole('button', { name: 'Open the market' }).click();
+  await expect(ana.locator('.first-turn')).toBeVisible();
+  await shot(budi, '02b-first-turn');
 
-  await waitForMyTurn(ana);
+  await hostOpens(ana, budi);
   await expect(budi.locator('.topbar__turn')).toHaveText("Ana's turn");
   await ana.waitForTimeout(800);
   await shot(ana, '03-table-start');
@@ -182,7 +192,7 @@ test('solo game against a bot advances automatically', async ({ browser }) => {
   await expect(solo.locator('.topbar__turn')).not.toHaveText('Your turn');
   await waitForMyTurn(solo);
   await solo.getByRole('button', { name: 'Move log' }).click();
-  await expect(solo.locator('.log__line')).toHaveCount(3);
+  await expect.poll(() => solo.locator('.log__line').count()).toBeGreaterThanOrEqual(3);
   await shot(solo, '07-vs-bots');
 });
 
@@ -216,7 +226,7 @@ const twoFriends = async (browser: Browser) => {
   await budi.getByRole('button', { name: 'Take a seat' }).click();
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
   await ana.getByRole('button', { name: 'Open the market' }).click();
-  await waitForMyTurn(ana);
+  await hostOpens(ana, budi);
   return { ana, budi };
 };
 
@@ -258,6 +268,32 @@ test('host removes a player mid-game and a bot takes over', async ({ browser }) 
   await expect(budi.getByText('The host removed you from this table.')).toBeVisible();
   await expect(ana.getByRole('button', { name: /^Budi \(bot\), \d+ prestige/ })).toBeVisible();
   await waitForMyTurn(ana);
+});
+
+test('the host pauses and resumes the game', async ({ browser }) => {
+  const { ana, budi } = await twoFriends(browser);
+  await ana.getByRole('button', { name: 'Menu' }).click();
+  await ana.getByRole('button', { name: 'Pause game' }).click();
+  await expect(budi.locator('.pause')).toBeVisible();
+  await expect(budi.getByText('Ana paused the game.')).toBeVisible();
+  await expect(budi.getByRole('button', { name: 'Resume game' })).toHaveCount(0);
+  const frozen = await ana.locator('.topbar__clock').textContent();
+  await ana.waitForTimeout(2_000);
+  await expect(ana.locator('.topbar__clock')).toHaveText(frozen ?? '');
+  await shot(budi, '12a-paused');
+
+  await budi.locator('.pause').getByRole('button', { name: 'Chat' }).click();
+  await budi.getByLabel('Chat message').fill('coffee break');
+  await budi.getByRole('button', { name: 'Send' }).click();
+  await budi.getByRole('button', { name: 'Close' }).click();
+  await ana.locator('.pause').getByRole('button', { name: 'Chat' }).click();
+  await expect(ana.locator('.chat__text', { hasText: 'coffee break' })).toBeVisible();
+  await ana.getByRole('button', { name: 'Close' }).click();
+
+  await ana.getByRole('button', { name: 'Resume game' }).click();
+  await expect(budi.locator('.pause')).toHaveCount(0);
+  await takeSpices(ana, ['Saffron', 'Cardamom', 'Sumac']);
+  await waitForMyTurn(budi);
 });
 
 test('a guest leaves the lobby and the host closes the room', async ({ browser }) => {
@@ -321,7 +357,7 @@ test('a viewer watches, chats and then takes a seat', async ({ browser }) => {
   await expect(ana.locator('.watchers')).toHaveCount(0);
 
   await ana.getByRole('button', { name: 'Open the market' }).click();
-  await waitForMyTurn(ana);
+  await hostOpens(ana, vera);
   const citra = await newPlayer(browser);
   await citra.goto(`/r/${code}`);
   await citra.getByLabel('Your merchant name').fill('Citra');

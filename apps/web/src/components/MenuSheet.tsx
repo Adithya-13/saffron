@@ -19,6 +19,7 @@ export const MenuSheet = ({ onClose, onRules, onSound }: Props) => {
   const seated = useStore((s) => s.seatId !== null);
   const watching = useStore((s) => s.viewerId !== null);
   const isHost = useStore((s) => s.seatId !== null && s.seatId === s.room?.hostSeatId);
+  const paused = useStore((s) => s.room?.pausedAt != null);
   const handsSeat = seated && status !== 'finished';
 
   const leave = () => {
@@ -48,6 +49,18 @@ export const MenuSheet = ({ onClose, onRules, onSound }: Props) => {
             Copy link
           </button>
         </div>
+        {isHost && status === 'playing' && (
+          <button
+            className="menu__item"
+            type="button"
+            onClick={() => {
+              send({ type: 'setPaused', paused: !paused });
+              onClose();
+            }}
+          >
+            {paused ? 'Resume game' : 'Pause game'}
+          </button>
+        )}
         <button className="menu__item" type="button" onClick={onRules}>
           How to play
         </button>

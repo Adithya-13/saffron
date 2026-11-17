@@ -88,6 +88,7 @@ const ERROR_TEXT: Partial<Record<ErrorCode, string>> = {
   undoUnavailable: 'Take-back is no longer available',
   notHost: 'Only the host can do that',
   notInLobby: 'The game has already started',
+  paused: 'The game is paused',
 };
 
 let toastCounter = 0;

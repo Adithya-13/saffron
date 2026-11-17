@@ -11,6 +11,7 @@ export const DEFAULT_THEME: Theme = 'paper';
 
 export const TURN_MS = 60_000;
 export const TURN_WARN_MS = 15_000;
+export const START_INTRO_MS = 3_000;
 
 export type ClientMessage =
   | {
@@ -20,6 +21,7 @@ export type ClientMessage =
       readonly watch?: boolean | undefined;
     }
   | { readonly type: 'takeSeat' }
+  | { readonly type: 'setPaused'; readonly paused: boolean }
   | { readonly type: 'start' }
   | { readonly type: 'addBot' }
   | { readonly type: 'removeSeat'; readonly seatId: string }
@@ -79,6 +81,7 @@ export type RoomSnapshot = {
   readonly turnDeadline: number | null;
   readonly turnExtended: boolean;
   readonly autopilot: readonly string[];
+  readonly pausedAt: number | null;
 };
 
 export type ErrorCode =
@@ -94,7 +97,8 @@ export type ErrorCode =
   | 'rateLimited'
   | 'undoUnavailable'
   | 'notJoined'
-  | 'undoPending';
+  | 'undoPending'
+  | 'paused';
 
 export type ServerMessage =
   | {
