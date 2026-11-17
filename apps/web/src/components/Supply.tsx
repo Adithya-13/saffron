@@ -23,12 +23,13 @@ export const Supply = ({ interactive }: { readonly interactive: boolean }) => {
       setDraft([...draft, spice]);
       return;
     }
-    showToast(
-      draft.includes(spice)
-        ? 'Two of a kind needs a pile of 4 or more, and nothing else in hand'
-        : 'Take 3 different spices, or 2 of the same',
-      'error',
-    );
+    if (draft.includes(spice)) {
+      const index = draft.lastIndexOf(spice);
+      setDraft(draft.filter((_, i) => i !== index));
+      if (draft.length === 1) showToast('Two of a kind needs a pile of 4 or more');
+      return;
+    }
+    showToast('Take 3 different spices, or 2 of the same', 'error');
   };
 
   return (

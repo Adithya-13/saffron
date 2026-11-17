@@ -1,8 +1,10 @@
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { SPICE_INFO } from '@saffron/content';
 import { SPICES, TOKENS, bonusesOf, totalTokens } from '@saffron/engine';
-import type { PlayerPublic } from '@saffron/engine';
+import type { RoomSnapshot } from '@saffron/protocol';
 import { anchors } from '../anim/plan.ts';
+import { send } from '../net/socket.ts';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { currentOf, nameOf, seatIndex } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
@@ -24,49 +26,56 @@ export const Points = ({ points, className }: { points: number; className: strin
   </motion.span>
 );
 
-type StripProps = {
-  readonly others: readonly PlayerPublic[];
-  readonly onOpen: (id: string) => void;
+type StripProps = { readonly onOpen: (id: string) => void };
+
+const MANY_PLAYERS = 4;
+const BONUS_ROW_MAX_PLAYERS = 2;
+
+const statusOf = (room: RoomSnapshot | null, id: string): 'away' | 'bot' | null => {
+  if (room?.autopilot.includes(id)) return 'bot';
+  return room?.seats.find((s) => s.id === id)?.connected === false ? 'away' : null;
 };
 
-export const Opponents = ({ others, onOpen }: StripProps) => {
+export const Players = ({ onOpen }: StripProps) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
+  const seatId = useStore((s) => s.seatId);
+  if (!view) return null;
+  const players = view.players;
   const current = currentOf(view);
-  const connected = (id: string) => room?.seats.find((s) => s.id === id)?.connected ?? false;
+  const many = players.length >= MANY_PLAYERS;
 
   return (
-    <section
-      className={`opponents${others.length >= 4 ? ' opponents--many' : ''}`}
-      aria-label="Other merchants"
-    >
-      {others.map((p) => {
+    <section className={`opponents${many ? ' opponents--many' : ''}`} aria-label="Merchants">
+      {players.map((p) => {
         const bonuses = bonusesOf(p.cards);
-        const name = nameOf(room, p.id);
-        const active = current?.id === p.id && !view?.finished;
+        const mine = p.id === seatId;
+        const name = mine ? 'You' : nameOf(room, p.id);
+        const active = current?.id === p.id && !view.finished;
+        const status = statusOf(room, p.id);
         return (
           <button
             key={p.id}
             type="button"
-            className={`opp${active ? ' opp--active' : ''}`}
-            data-anchor={anchors.player(p.id)}
+            className={`opp${active ? ' opp--active' : ''}${mine ? ' opp--me' : ''}`}
+            data-anchor={mine ? undefined : anchors.player(p.id)}
             onClick={() => onOpen(p.id)}
             aria-label={`${name}, ${p.points} prestige${active ? ', playing now' : ''}`}
           >
             <span className="opp__head">
               <Avatar
                 index={seatIndex(room, p.id)}
-                name={name}
-                size={others.length >= 4 ? 20 : 22}
+                name={nameOf(room, p.id)}
+                size={many ? 20 : 22}
               />
               <span className="opp__name">
                 {name}
-                {!connected(p.id) && <span className="opp__away"> · away</span>}
+                {status && <span className="opp__away"> · {status}</span>}
               </span>
               <Points points={p.points} className="opp__points" />
             </span>
             <span className="opp__meta">
-              {others.length < 3 &&
+              {players.length <= BONUS_ROW_MAX_PLAYERS &&
                 SPICES.map((s) => (
                   <span
                     key={s}
@@ -95,12 +104,53 @@ export const Opponents = ({ others, onOpen }: StripProps) => {
 
 type DetailProps = { readonly playerId: string; readonly onClose: () => void };
 
+const RemovePlayer = ({ name, onRemove }: { name: string; onRemove: () => void }) => {
+  const [confirming, setConfirming] = useState(false);
+  if (!confirming) {
+    return (
+      <button
+        className="btn btn--ghost btn--small"
+        type="button"
+        onClick={() => setConfirming(true)}
+      >
+        Remove from game
+      </button>
+    );
+  }
+  return (
+    <div className="confirm">
+      <p className="small">
+        Remove {name}? A bot takes over their stall and they can't rejoin this game.
+      </p>
+      <span className="confirm__actions">
+        <button
+          className="btn btn--ghost btn--small"
+          type="button"
+          onClick={() => setConfirming(false)}
+        >
+          Cancel
+        </button>
+        <button className="btn btn--danger btn--small" type="button" onClick={onRemove}>
+          Remove
+        </button>
+      </span>
+    </div>
+  );
+};
+
 export const PlayerDetail = ({ playerId, onClose }: DetailProps) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
+  const seatId = useStore((s) => s.seatId);
   const select = useStore((s) => s.select);
   const player = view?.players.find((p) => p.id === playerId);
   if (!player) return null;
+  const canRemove =
+    room?.status === 'playing' &&
+    seatId !== null &&
+    room.hostSeatId === seatId &&
+    player.id !== seatId &&
+    room.seats.find((s) => s.id === player.id)?.kind === 'human';
   const name = nameOf(room, player.id);
   const bonuses = bonusesOf(player.cards);
 
@@ -165,6 +215,15 @@ export const PlayerDetail = ({ playerId, onClose }: DetailProps) => {
               ))}
             </div>
           </div>
+        )}
+        {canRemove && (
+          <RemovePlayer
+            name={name}
+            onRemove={() => {
+              send({ type: 'removeSeat', seatId: player.id });
+              onClose();
+            }}
+          />
         )}
       </div>
     </Sheet>

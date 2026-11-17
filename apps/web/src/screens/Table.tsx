@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { SPICES, TIERS } from '@saffron/engine';
+import { TURN_MS } from '@saffron/protocol';
 import { useAnim } from '../anim/animStore.ts';
+import { AwaySheet } from '../components/AwaySheet.tsx';
 import { ChatIcon, LogIcon, MenuIcon } from '../art/Icons.tsx';
 import { cardArt } from '../components/Card.tsx';
 import { CardDetail } from '../components/CardDetail.tsx';
@@ -12,13 +14,14 @@ import { GuildDetail, GuildStrip, guildArt } from '../components/Guilds.tsx';
 import { LogPanel } from '../components/LogPanel.tsx';
 import { Market } from '../components/Market.tsx';
 import { MenuSheet } from '../components/MenuSheet.tsx';
-import { Opponents, PlayerDetail } from '../components/Opponents.tsx';
+import { PlayerDetail, Players } from '../components/Opponents.tsx';
 import { PhaseSheets } from '../components/PhaseSheets.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Sheet } from '../components/Sheet.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Supply } from '../components/Supply.tsx';
 import { UndoBar } from '../components/UndoBar.tsx';
+import { useTurnRemaining } from '../state/clock.ts';
 import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 
@@ -29,6 +32,7 @@ type Panel =
   | null;
 
 const END_SCREEN_DELAY_MS = 500;
+const LOW_TIME_MS = 10_000;
 
 const preload = (urls: readonly string[]): void => {
   for (const url of urls) {
@@ -48,8 +52,11 @@ export const Table = () => {
   const finished = view?.finished ?? false;
   const [showEnd, setShowEnd] = useState(false);
   const guildIds = view?.guilds.map((g) => g.id).join(',') ?? '';
+  const remaining = useTurnRemaining();
+  const myTurn = isMyTurn(view, seatId);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
     preload(TIERS.flatMap((tier) => SPICES.map((bonus) => cardArt({ tier, bonus }))));
   }, []);
 
@@ -67,13 +74,21 @@ export const Table = () => {
     return () => clearTimeout(timer);
   }, [finished, flightsActive]);
 
+  useEffect(() => {
+    if (!myTurn) return;
+    const base = document.title;
+    document.title = `Your turn · ${base}`;
+    return () => {
+      document.title = base;
+    };
+  }, [myTurn]);
+
   if (!view || !room) return null;
 
   const me = meOf(view, seatId);
-  const myTurn = isMyTurn(view, seatId);
   const interactive = myTurn && view.phase.kind === 'action' && !room.undoVote;
   const current = currentOf(view);
-  const others = view.players.filter((p) => p.id !== seatId);
+  const lowTime = remaining !== null && remaining <= LOW_TIME_MS;
   const close = () => setPanel(null);
 
   return (
@@ -85,8 +100,20 @@ export const Table = () => {
               {myTurn ? 'Your turn' : `${nameOf(room, current.id)}'s turn`}
             </span>
           )}
+          {remaining !== null && (
+            <span className={`topbar__clock${lowTime ? ' topbar__clock--low' : ''}`}>
+              {Math.ceil(remaining / 1000)}s
+            </span>
+          )}
           {view.finalRound && !view.finished && <span className="tag tag--final">Final round</span>}
         </span>
+        {remaining !== null && (
+          <span
+            className={`topbar__timer${lowTime ? ' topbar__timer--low' : ''}`}
+            style={{ transform: `scaleX(${remaining / Math.max(TURN_MS, remaining)})` }}
+            aria-hidden
+          />
+        )}
         <button
           className="icon-btn"
           type="button"
@@ -118,9 +145,7 @@ export const Table = () => {
       <UndoBar />
 
       <main className="board">
-        {others.length > 0 && (
-          <Opponents others={others} onOpen={(id) => setPanel({ kind: 'player', id })} />
-        )}
+        <Players onOpen={(id) => setPanel({ kind: 'player', id })} />
         <GuildStrip onOpen={(id) => setPanel({ kind: 'guild', id })} />
         <Market me={me} />
         <Supply interactive={interactive} />
@@ -130,6 +155,7 @@ export const Table = () => {
 
       <CardDetail me={me} interactive={interactive} />
       <PhaseSheets me={me} myTurn={myTurn} />
+      <AwaySheet myTurn={myTurn} remaining={remaining} />
       {panel?.kind === 'log' && (
         <Sheet title="Move log" onClose={close} tall>
           <LogPanel />

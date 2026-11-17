@@ -64,10 +64,23 @@ const Connecting = ({ failed }: { failed: boolean }) => (
   </main>
 );
 
+const Kicked = () => (
+  <main className="center-screen">
+    <div className="panel connecting">
+      <h1>Removed from the table</h1>
+      <p>The host removed you from this table.</p>
+      <button className="btn btn--primary" type="button" onClick={() => navigate('/')}>
+        Back to the bazaar
+      </button>
+    </div>
+  </main>
+);
+
 export const RoomScreen = ({ code }: { code: string }) => {
   const [hasName, setHasName] = useState(() => loadName().trim().length > 0);
   const connection = useStore((s) => s.connection);
   const room = useStore((s) => s.room);
+  const kicked = useStore((s) => s.kicked);
   const reconnecting = connection === 'reconnecting';
   useRoomTheme(room?.theme);
 
@@ -78,6 +91,7 @@ export const RoomScreen = ({ code }: { code: string }) => {
   }, [code, hasName]);
 
   if (!hasName) return <NamePrompt onDone={() => setHasName(true)} />;
+  if (kicked) return <Kicked />;
   if (!room) {
     return (
       <>

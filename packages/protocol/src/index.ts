@@ -8,6 +8,7 @@ export const THEMES = ['paper', 'night', 'harbour'] as const;
 export type Theme = (typeof THEMES)[number];
 export const DEFAULT_THEME: Theme = 'paper';
 
+export const TURN_MS = 60_000;
 export const TURN_WARN_MS = 5_000;
 
 export type ClientMessage =

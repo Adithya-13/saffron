@@ -11,7 +11,7 @@ import {
   viewFor,
 } from '@saffron/engine';
 import type { GameEvent, GameState, Move, RngState } from '@saffron/engine';
-import { DEFAULT_THEME } from '@saffron/protocol';
+import { DEFAULT_THEME, TURN_MS } from '@saffron/protocol';
 import type {
   ChatMessage,
   ClientMessage,
@@ -27,7 +27,7 @@ import type {
 export const BOT_DELAY_MS = 1100;
 export const UNDO_VOTE_MS = 20_000;
 export const CHAT_COOLDOWN_MS = 600;
-export const TURN_MS = 60_000;
+export { TURN_MS };
 export const EXTEND_MS = 30_000;
 export const DISCONNECT_GRACE_MS = 15_000;
 const LOG_LIMIT = 300;
@@ -388,10 +388,7 @@ const humanVoters = (room: RoomState, requesterId: string): string[] =>
   room.seats
     .filter(
       (s) =>
-        s.kind === 'human' &&
-        s.connected &&
-        s.id !== requesterId &&
-        !room.autopilot.includes(s.id),
+        s.kind === 'human' && s.connected && s.id !== requesterId && !room.autopilot.includes(s.id),
     )
     .map((s) => s.id);
 
@@ -530,12 +527,7 @@ export const handleMessage = (
   ctx: Ctx,
 ): Outcome => clocked(route(room, senderId, msg, ctx), ctx.now);
 
-const route = (
-  room: RoomState,
-  senderId: string | null,
-  msg: ClientMessage,
-  ctx: Ctx,
-): Outcome => {
+const route = (room: RoomState, senderId: string | null, msg: ClientMessage, ctx: Ctx): Outcome => {
   if (msg.type === 'join') return join(room, msg, ctx);
   if (senderId === null) return failure(room, 'notJoined');
   switch (msg.type) {

@@ -199,7 +199,63 @@ test('host fills eight seats and picks a theme', async ({ browser }) => {
   await shot(host, '10-lobby-eight-night');
   await host.getByRole('button', { name: 'Open the market' }).click();
   await waitForMyTurn(host);
-  await expect(host.locator('.opponents--many .opp')).toHaveCount(7);
+  await expect(host.locator('.opponents--many .opp')).toHaveCount(8);
   await host.waitForTimeout(800);
   await shot(host, '11-table-eight-night');
+});
+
+const twoFriends = async (browser: Browser) => {
+  const ana = await newPlayer(browser);
+  await ana.goto('/');
+  await ana.getByLabel('Your merchant name').fill('Ana');
+  await ana.getByRole('button', { name: 'Host a new game' }).click();
+  await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
+  const budi = await newPlayer(browser);
+  await budi.goto(ana.url());
+  await budi.getByLabel('Your merchant name').fill('Budi');
+  await budi.getByRole('button', { name: 'Enter' }).click();
+  await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
+  await ana.getByRole('button', { name: 'Open the market' }).click();
+  await waitForMyTurn(ana);
+  return { ana, budi };
+};
+
+const pileOf = (page: Page, label: string) =>
+  page.getByRole('button', { name: new RegExp(`^${label}: \\d+ left`) });
+
+test('picked spices survive looking at a card and chat', async ({ browser }) => {
+  const { ana, budi } = await twoFriends(browser);
+  for (const label of ['Saffron', 'Cardamom', 'Sumac']) await pileOf(ana, label).click();
+  await expect(ana.locator('.pile--picked')).toHaveCount(3);
+
+  await ana.locator('.market__row--t1 .market__slot button.card').first().click();
+  await expect(ana.locator('.detail')).toBeVisible();
+  await ana.getByRole('button', { name: 'Close' }).click();
+  await expect(ana.locator('.pile--picked')).toHaveCount(3);
+
+  await budi.getByRole('button', { name: /^Chat/ }).click();
+  await budi.getByLabel('Chat message').fill('hurry up');
+  await budi.getByRole('button', { name: 'Send' }).click();
+  await budi.reload();
+  await expect(ana.locator('.chat-bubble')).toBeVisible();
+  await expect(ana.locator('.pile--picked')).toHaveCount(3);
+
+  await pileOf(ana, 'Sumac').click();
+  await expect(ana.locator('.pile--picked')).toHaveCount(2);
+  await shot(ana, '07-draft-kept');
+  await takeSpices(ana, ['Salt']);
+  await waitForMyTurn(budi);
+});
+
+test('host removes a player mid-game and a bot takes over', async ({ browser }) => {
+  const { ana, budi } = await twoFriends(browser);
+  await expect(ana.locator('.topbar__clock')).toBeVisible();
+  await takeSpices(ana, ['Saffron', 'Cardamom', 'Sumac']);
+  await waitForMyTurn(budi);
+  await ana.getByRole('button', { name: /^Budi, \d+ prestige/ }).click();
+  await ana.getByRole('button', { name: 'Remove from game' }).click();
+  await ana.getByRole('button', { name: 'Remove', exact: true }).click();
+  await expect(budi.getByText('The host removed you from this table.')).toBeVisible();
+  await expect(ana.getByRole('button', { name: /^Budi \(bot\), \d+ prestige/ })).toBeVisible();
+  await waitForMyTurn(ana);
 });

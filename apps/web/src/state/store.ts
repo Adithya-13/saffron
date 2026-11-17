@@ -57,6 +57,8 @@ type State = {
   readonly draft: readonly Spice[];
   readonly selection: Selection;
   readonly toast: Toast | null;
+  readonly serverOffset: number;
+  readonly kicked: boolean;
 };
 
 type Actions = {
@@ -102,9 +104,20 @@ export const useStore = create<State & Actions>()((set, get) => ({
   draft: [],
   selection: null,
   toast: null,
+  serverOffset: 0,
+  kicked: false,
 
   setCode: (code) =>
-    set({ code, room: null, view: null, queue: [], chat: [], log: [], seatId: null }),
+    set({
+      code,
+      room: null,
+      view: null,
+      queue: [],
+      chat: [],
+      log: [],
+      seatId: null,
+      kicked: false,
+    }),
   setConnection: (connection) => set({ connection }),
 
   receive: (message) => {
@@ -113,7 +126,10 @@ export const useStore = create<State & Actions>()((set, get) => ({
         set({ seatId: message.seatId });
         return;
       case 'sync':
-        set((s) => ({ queue: [...s.queue, message] }));
+        set((s) => ({
+          queue: [...s.queue, message],
+          serverOffset: message.serverNow - Date.now(),
+        }));
         return;
       case 'chat':
         set((s) => ({
@@ -126,6 +142,9 @@ export const useStore = create<State & Actions>()((set, get) => ({
         return;
       case 'error':
         get().showToast(ERROR_TEXT[message.code] ?? 'That move is not allowed', 'error');
+        return;
+      case 'kicked':
+        set({ kicked: true });
         return;
     }
   },
@@ -151,7 +170,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
   },
 
   setDraft: (draft) => set({ draft, selection: null }),
-  select: (selection) => set({ selection, draft: [] }),
+  select: (selection) => set({ selection }),
 
   showToast: (text, tone = 'info') => {
     const id = ++toastCounter;
