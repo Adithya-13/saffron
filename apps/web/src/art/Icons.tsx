@@ -29,6 +29,13 @@ export const ChatIcon = () => (
   </Svg>
 );
 
+export const CompareIcon = () => (
+  <Svg>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+    <path d="M3.5 9.5h17M3.5 14.5h17M9 4.5v15" />
+  </Svg>
+);
+
 export const MenuIcon = () => (
   <Svg>
     <circle cx="5" cy="12" r="1.2" fill="currentColor" />

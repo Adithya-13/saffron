@@ -91,13 +91,26 @@ const startTrack = (track: MusicTrack): (() => void) | null => {
   return startCalmMusic(ctx, Howler.masterGain, track);
 };
 
+const pageVisible = (): boolean =>
+  typeof document === 'undefined' || document.visibilityState === 'visible';
+
+const stopMusic = (): void => {
+  playing?.stop();
+  playing = null;
+};
+
+const silence = (): void => {
+  stopMusic();
+  Howler.stop();
+  void Howler.ctx?.suspend();
+};
+
 const syncMusic = (): void => {
-  if (!unlocked) return;
+  if (!unlocked || !pageVisible()) return;
   const s = useAudioSettings.getState();
   const wanted = s.musicOn && s.volume > 0 ? s.track : null;
   if (playing?.track === wanted) return;
-  playing?.stop();
-  playing = null;
+  stopMusic();
   if (wanted === null) return;
   const stop = startTrack(wanted);
   if (stop) playing = { track: wanted, stop };
@@ -139,3 +152,17 @@ export const playClinks = (count: number, startDelay = 0, gap = 70): void => {
 };
 
 Howler.volume(useAudioSettings.getState().volume);
+
+const onVisibility = (): void => {
+  if (pageVisible()) {
+    void Howler.ctx?.resume();
+    syncMusic();
+    return;
+  }
+  silence();
+};
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', silence);
+}

@@ -7,6 +7,7 @@ import {
   deficitFor,
   nextFloat,
   paymentFor,
+  seedRng,
   subtractTokens,
   tokensFrom,
   totalTokens,
@@ -32,11 +33,22 @@ type Holdings = {
   readonly taken: ReadonlySet<string>;
 };
 
+export type Personality = {
+  readonly gamma: number;
+  readonly engine: number;
+  readonly denial: number;
+  readonly reserve: number;
+  readonly seal: number;
+  readonly favorite: Spice;
+  readonly favoriteBias: number;
+};
+
 type Context = {
   readonly view: PlayerView;
   readonly me: PlayerPublic;
   readonly opponents: readonly PlayerPublic[];
   readonly engineWeight: number;
+  readonly persona: Personality;
 };
 
 const GAMMA = 0.6;
@@ -50,9 +62,36 @@ const RESERVE_SLOT_COST = 0.35;
 const BLIND_RESERVE_VALUE = 0.3;
 const DENIAL_WEIGHT = 0.7;
 const WIN_BONUS = 25;
-const NOISE = 0.05;
+const TIE_MARGIN = 0.12;
 const ENGINE_WEIGHT = 0.25;
 const OVERFLOW_PENALTY = 0.6;
+
+const hashOf = (text: string): number => {
+  let hash = 2_166_136_261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return hash >>> 0;
+};
+
+export const personalityOf = (playerId: string): Personality => {
+  let rng = seedRng(hashOf(playerId));
+  const roll = (low: number, high: number): number => {
+    const step = nextFloat(rng);
+    rng = step.next;
+    return low + step.value * (high - low);
+  };
+  return {
+    gamma: GAMMA * roll(0.85, 1.15),
+    engine: ENGINE_WEIGHT * roll(0.75, 1.25),
+    denial: DENIAL_WEIGHT * roll(0.75, 1.25),
+    reserve: roll(0.6, 1.4),
+    seal: SEAL_VALUE * roll(0.75, 1.25),
+    favorite: SPICES[Math.floor(roll(0, SPICES.length))] ?? 'saffron',
+    favoriteBias: roll(0.1, 0.35),
+  };
+};
 
 const sum = (counts: Readonly<Record<string, number>>): number =>
   Object.values(counts).reduce((a, b) => a + b, 0);
@@ -86,7 +125,9 @@ const guildPull = (ctx: Context, h: Holdings, spice: Spice): number =>
   }, 0);
 
 const bonusValue = (ctx: Context, h: Holdings, spice: Spice): number =>
-  ctx.engineWeight * (0.5 + demandFor(ctx, h, spice)) + guildPull(ctx, h, spice) * 0.25;
+  ctx.engineWeight * (0.5 + demandFor(ctx, h, spice)) +
+  guildPull(ctx, h, spice) * 0.25 +
+  (spice === ctx.persona.favorite ? ctx.persona.favoriteBias : 0);
 
 const cardWorth = (ctx: Context, h: Holdings, card: Card): number =>
   card.points + bonusValue(ctx, h, card.bonus);
@@ -94,7 +135,10 @@ const cardWorth = (ctx: Context, h: Holdings, card: Card): number =>
 const planValue = (ctx: Context, h: Holdings): number => {
   const candidates = [...marketCards(ctx.view), ...h.reserved].filter((c) => !h.taken.has(c.id));
   const plans = candidates
-    .map((card) => cardWorth(ctx, h, card) * GAMMA ** (turnsToBuy(card, h, ctx.view.supply) + 1))
+    .map(
+      (card) =>
+        cardWorth(ctx, h, card) * ctx.persona.gamma ** (turnsToBuy(card, h, ctx.view.supply) + 1),
+    )
     .sort((a, b) => b - a);
   return TARGET_WEIGHTS.reduce((acc, weight, i) => acc + weight * (plans[i] ?? 0), 0);
 };
@@ -102,22 +146,24 @@ const planValue = (ctx: Context, h: Holdings): number => {
 const guildValue = (ctx: Context, h: Holdings): number =>
   ctx.view.guilds.reduce((acc, g) => {
     const missing = SPICES.reduce((m, s) => m + Math.max(g.requires[s] - h.bonuses[s], 0), 0);
-    return acc + g.points * GUILD_WEIGHT * GAMMA ** missing;
+    return acc + g.points * GUILD_WEIGHT * ctx.persona.gamma ** missing;
   }, 0);
 
 const engineValue = (ctx: Context, h: Holdings): number =>
-  sum(h.bonuses) * ctx.engineWeight * ENGINE_WEIGHT;
+  sum(h.bonuses) * ctx.engineWeight * ctx.persona.engine;
 
-const tokenValue = (h: Holdings): number => {
+const tokenValue = (ctx: Context, h: Holdings): number => {
   const held = totalTokens(h.tokens);
   const overflow = Math.max(held - MAX_TOKENS, 0);
   return (
-    (held - h.tokens.seal) * TOKEN_VALUE + h.tokens.seal * SEAL_VALUE - overflow * OVERFLOW_PENALTY
+    (held - h.tokens.seal) * TOKEN_VALUE +
+    h.tokens.seal * ctx.persona.seal -
+    overflow * OVERFLOW_PENALTY
   );
 };
 
 const positionValue = (ctx: Context, h: Holdings): number =>
-  h.points + planValue(ctx, h) + guildValue(ctx, h) + engineValue(ctx, h) + tokenValue(h);
+  h.points + planValue(ctx, h) + guildValue(ctx, h) + engineValue(ctx, h) + tokenValue(ctx, h);
 
 const holdingsOf = (me: PlayerPublic): Holdings => ({
   tokens: me.tokens,
@@ -155,7 +201,7 @@ const denialValue = (ctx: Context, card: Card): number =>
     if (!paymentFor(card.cost, bonusesOf(opp.cards), opp.tokens)) return acc;
     const wins = opp.points + card.points >= ctx.view.targetPoints;
     const threat = wins ? WIN_BONUS / 2 : card.points;
-    return Math.max(acc, (threat * DENIAL_WEIGHT) / (i + 1));
+    return Math.max(acc, (threat * ctx.persona.denial) / (i + 1));
   }, 0);
 
 const cardAt = (view: PlayerView, h: Holdings, move: Extract<Move, { type: 'buy' }>) =>
@@ -180,10 +226,10 @@ const scoreMove = (ctx: Context, base: Holdings, move: Move): number => {
     case 'takeDouble':
       return positionValue(ctx, withTokens(base, { [move.spice]: 2 }));
     case 'reserve': {
-      const slotCost = base.reservedSlots * RESERVE_SLOT_COST;
+      const slotCost = (base.reservedSlots * RESERVE_SLOT_COST) / ctx.persona.reserve;
       const gained = withTokens(base, sealIfAvailable(ctx.view));
       if (move.source.kind === 'deck') {
-        return positionValue(ctx, gained) + BLIND_RESERVE_VALUE - slotCost;
+        return positionValue(ctx, gained) + BLIND_RESERVE_VALUE * ctx.persona.reserve - slotCost;
       }
       const card = ctx.view.market[move.source.tier][move.source.slot];
       if (!card || base.reservedSlots >= MAX_RESERVED) return -Infinity;
@@ -213,7 +259,13 @@ const contextFor = (view: PlayerView): Context => {
     (_, i) => view.players[(view.currentPlayer + 1 + i) % count],
   ).filter((p): p is PlayerPublic => p !== undefined);
   const leader = Math.max(...view.players.map((p) => p.points));
-  return { view, me, opponents, engineWeight: Math.max(0, 1 - leader / view.targetPoints) * 1.5 };
+  return {
+    view,
+    me,
+    opponents,
+    engineWeight: Math.max(0, 1 - leader / view.targetPoints) * 1.5,
+    persona: personalityOf(me.id),
+  };
 };
 
 export const chooseMove = (
@@ -223,14 +275,13 @@ export const chooseMove = (
 ): { readonly move: Move; readonly next: RngState } => {
   const ctx = contextFor(view);
   const base = holdingsOf(ctx.me);
-  let state = rng;
-  let best: { move: Move; score: number } | null = null;
-  for (const move of moves) {
-    const step = nextFloat(state);
-    state = step.next;
-    const score = scoreMove(ctx, base, move) + step.value * NOISE;
-    if (!best || score > best.score) best = { move, score };
-  }
-  if (!best) throw new Error('No legal moves');
-  return { move: best.move, next: state };
+  const scored = moves.map((move) => ({ move, score: scoreMove(ctx, base, move) }));
+  const top = Math.max(...scored.map((m) => m.score));
+  const nearBest = Number.isFinite(top)
+    ? scored.filter((m) => m.score >= top - TIE_MARGIN)
+    : scored;
+  const step = nextFloat(rng);
+  const pick = nearBest[Math.floor(step.value * nearBest.length)];
+  if (!pick) throw new Error('No legal moves');
+  return { move: pick.move, next: step.next };
 };

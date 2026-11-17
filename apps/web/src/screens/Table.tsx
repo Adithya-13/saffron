@@ -3,7 +3,7 @@ import { SPICES, TIERS } from '@saffron/engine';
 import { TURN_MS } from '@saffron/protocol';
 import { useAnim } from '../anim/animStore.ts';
 import { AwaySheet } from '../components/AwaySheet.tsx';
-import { ChatIcon, LogIcon, MenuIcon } from '../art/Icons.tsx';
+import { ChatIcon, CompareIcon, LogIcon, MenuIcon } from '../art/Icons.tsx';
 import { cardArt } from '../components/Card.tsx';
 import { CardDetail } from '../components/CardDetail.tsx';
 import { ChatBubble } from '../components/ChatBubble.tsx';
@@ -16,6 +16,7 @@ import { Market } from '../components/Market.tsx';
 import { MenuSheet } from '../components/MenuSheet.tsx';
 import { PlayerDetail, Players } from '../components/Opponents.tsx';
 import { PhaseSheets } from '../components/PhaseSheets.tsx';
+import { PlayersTable } from '../components/PlayersTable.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Sheet } from '../components/Sheet.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
@@ -26,7 +27,7 @@ import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 
 type Panel =
-  | { readonly kind: 'log' | 'chat' | 'menu' | 'rules' | 'sound' }
+  | { readonly kind: 'log' | 'chat' | 'menu' | 'rules' | 'sound' | 'compare' }
   | { readonly kind: 'player'; readonly id: string }
   | { readonly kind: 'guild'; readonly id: string }
   | null;
@@ -117,6 +118,14 @@ export const Table = () => {
         <button
           className="icon-btn"
           type="button"
+          onClick={() => setPanel({ kind: 'compare' })}
+          aria-label="Compare all merchants"
+        >
+          <CompareIcon />
+        </button>
+        <button
+          className="icon-btn"
+          type="button"
           onClick={() => setPanel({ kind: 'log' })}
           aria-label="Move log"
         >
@@ -175,6 +184,7 @@ export const Table = () => {
       )}
       {panel?.kind === 'rules' && <RulesSheet onClose={close} />}
       {panel?.kind === 'sound' && <SoundSettings onClose={close} />}
+      {panel?.kind === 'compare' && <PlayersTable onClose={close} />}
       {panel?.kind === 'player' && <PlayerDetail playerId={panel.id} onClose={close} />}
       {panel?.kind === 'guild' && <GuildDetail guildId={panel.id} onClose={close} />}
       {showEnd && <EndScreen />}

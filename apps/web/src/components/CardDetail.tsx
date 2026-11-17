@@ -4,7 +4,7 @@ import type { Card as CardData, Move, PlayerPublic, PlayerView, Tier } from '@sa
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { send } from '../net/socket.ts';
 import { buyMove, isLegal, reserveMove } from '../state/moves.ts';
-import { nameOf } from '../state/selectors.ts';
+import { buyersOf, listNames, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import type { Selection } from '../state/store.ts';
 import { Card, CardBack } from './Card.tsx';
@@ -123,6 +123,7 @@ export const CardDetail = ({ me, interactive }: Props) => {
   const canReserve = interactive && reserve !== null && isLegal(legal, reserve);
   const reserveFull = (me?.reserved.length ?? 0) >= MAX_RESERVED;
   const close = () => select(null);
+  const rivals = card ? buyersOf(view, card, seatId) : [];
   const submit = (move: Move) => {
     send({ type: 'move', move });
     close();
@@ -169,6 +170,12 @@ export const CardDetail = ({ me, interactive }: Props) => {
               </dd>
             </div>
             {me && (!owner || owner === seatId) && <Payment card={card} me={me} />}
+            {!owner && rivals.length > 0 && (
+              <div className="detail__fact">
+                <dt>Can buy it now</dt>
+                <dd>{listNames(rivals.map((p) => nameOf(room, p.id)))}</dd>
+              </div>
+            )}
           </dl>
         ) : (
           <div className="detail__blind">

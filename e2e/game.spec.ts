@@ -199,7 +199,7 @@ test('host fills eight seats and picks a theme', async ({ browser }) => {
   await shot(host, '10-lobby-eight-night');
   await host.getByRole('button', { name: 'Open the market' }).click();
   await waitForMyTurn(host);
-  await expect(host.locator('.opponents--many .opp')).toHaveCount(8);
+  await expect(host.locator('.opponents .opp')).toHaveCount(8);
   await host.waitForTimeout(800);
   await shot(host, '11-table-eight-night');
 });

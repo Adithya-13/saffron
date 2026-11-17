@@ -1,18 +1,20 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { TIERS, bonusesOf, paymentFor } from '@saffron/engine';
+import { TIERS } from '@saffron/engine';
 import type { Card as CardData, PlayerPublic, Tier } from '@saffron/engine';
 import { TIER_INFO } from '@saffron/content';
 import { anchors } from '../anim/plan.ts';
 import { markBlindTipSeen } from '../net/storage.ts';
+import { canAfford } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import type { Selection } from '../state/store.ts';
+import { Buyers } from './Buyers.tsx';
 import { Card, CardBack, tierRoman } from './Card.tsx';
 
 export const sameSelection = (a: Selection, b: Selection): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
 export const affordable = (me: PlayerPublic | null, card: CardData): boolean =>
-  me !== null && paymentFor(card.cost, bonusesOf(me.cards), me.tokens) !== null;
+  me !== null && canAfford(me, card);
 
 const ReserveRow = ({ me }: { readonly me: PlayerPublic }) => {
   const selection = useStore((s) => s.selection);
@@ -116,6 +118,7 @@ export const Market = ({ me }: { readonly me: PlayerPublic | null }) => {
                         }
                         onClick={() => select(target)}
                       />
+                      <Buyers card={card} />
                     </motion.div>
                   ) : (
                     <div className="card-slot--empty" />

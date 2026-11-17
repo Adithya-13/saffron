@@ -1054,44 +1054,47 @@ h3 {
 /* Opponents */
 .opponents {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  margin: 0 calc(-1 * var(--gutter));
+  padding: 0 var(--gutter);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding: 0 var(--gutter);
+  scrollbar-width: none;
+}
+
+.opponents::-webkit-scrollbar {
+  display: none;
 }
 
 .opp {
-  flex: 1;
+  flex: 0 0 min(46%, 176px);
   min-width: 0;
   display: grid;
-  gap: 3px;
-  padding: 6px 10px;
+  gap: 4px;
+  padding: 6px 8px;
   border-radius: var(--radius-md);
   border: 1px solid var(--line);
   background: var(--paper-raised);
   text-align: left;
   cursor: pointer;
+  scroll-snap-align: start;
 }
 
-.opponents--many {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+.opponents--fit .opp {
+  flex: 1 1 0;
 }
 
-.opponents--many .opp {
-  gap: 1px;
-  padding: 4px 6px;
-  min-height: 44px;
+.opp__row {
+  display: flex;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
 }
 
-.opponents--many .opp__head {
-  gap: 4px;
-}
-
-.opponents--many .opp__name {
-  font-size: 0.75rem;
-}
-
-.opponents--many .opp__extra {
-  font-size: 0.75rem;
+.mini-bonus.mini-token {
+  border-radius: 50%;
+  min-width: 18px;
 }
 
 .opp--active {
@@ -1101,16 +1104,6 @@ h3 {
 
 .opp--me {
   background: var(--paper-sunk);
-}
-
-.opp--me.opp--active {
-  background: var(--ink);
-  color: var(--paper-raised);
-}
-
-.opp--me.opp--active .opp__away,
-.opp--me.opp--active .opp__extra {
-  color: inherit;
 }
 
 .opp__head {
@@ -1143,45 +1136,20 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
-.opp__meta {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 0.8125rem;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.opp__extra {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.opp__tok,
 .opp__res {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  font-size: 0.8125rem;
+  color: var(--ink-2);
 }
 
-.opp__tok::before,
 .opp__res::before {
   content: '';
   display: inline-block;
-  border: 1.5px solid var(--ink-2);
-}
-
-.opp__tok::before {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-
-.opp__res::before {
   width: 8px;
   height: 11px;
+  border: 1.5px solid var(--ink-2);
   border-radius: 2px;
 }
 
@@ -1340,6 +1308,7 @@ h3 {
 }
 
 .market__card {
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -2124,6 +2093,122 @@ button.card {
 .tracks__detail {
   display: block;
   font-size: 0.8125rem;
+  color: var(--ink-2);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.compare {
+  overflow-x: auto;
+}
+
+.compare__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare__table th,
+.compare__table td {
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.compare__table thead th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.compare__table tbody th {
+  text-align: left;
+  font-weight: 600;
+  max-width: 108px;
+}
+
+.compare__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.compare__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compare__res {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ink-2);
+}
+
+.compare__disc {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.compare__tok {
+  margin-left: 1px;
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
+
+.compare__zero {
+  opacity: 0.35;
+}
+
+.compare__pts {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.compare__row--active {
+  background: var(--paper-sunk);
+}
+
+.compare__row--active th {
+  padding-left: 6px;
+  box-shadow: inset 3px 0 0 var(--ink);
+}
+
+.buyers {
+  position: absolute;
+  right: 3px;
+  top: 40%;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--paper-raised);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  pointer-events: none;
+}
+
+.buyers .avatar + .avatar {
+  margin-left: -5px;
+}
+
+.buyers .avatar {
+  box-shadow: 0 0 0 1.5px var(--paper-raised);
+}
+
+.buyers__more {
+  padding: 0 3px;
+  font-size: 0.6875rem;
+  font-weight: 700;
   color: var(--ink-2);
 }
 

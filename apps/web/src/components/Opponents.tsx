@@ -1,6 +1,8 @@
 import { motion } from 'motion/react';
+import { useEffect, useRef } from 'react';
 import { SPICE_INFO } from '@saffron/content';
 import { SPICES, TOKENS, bonusesOf, totalTokens } from '@saffron/engine';
+import type { PlayerPublic } from '@saffron/engine';
 import type { RoomSnapshot } from '@saffron/protocol';
 import { anchors } from '../anim/plan.ts';
 import { send } from '../net/socket.ts';
@@ -28,73 +30,104 @@ export const Points = ({ points, className }: { points: number; className: strin
 
 type StripProps = { readonly onOpen: (id: string) => void };
 
-const MANY_PLAYERS = 4;
-const BONUS_ROW_MAX_PLAYERS = 2;
-
 const statusOf = (room: RoomSnapshot | null, id: string): 'away' | 'bot' | null => {
   if (room?.autopilot.includes(id)) return 'bot';
   return room?.seats.find((s) => s.id === id)?.connected === false ? 'away' : null;
 };
 
+const Discounts = ({ player }: { readonly player: PlayerPublic }) => {
+  const bonuses = bonusesOf(player.cards);
+  return (
+    <span
+      className="opp__row"
+      aria-label={`Discounts: ${SPICES.map((s) => `${bonuses[s]} ${SPICE_INFO[s].label}`).join(', ')}`}
+    >
+      {SPICES.map((s) => (
+        <span
+          key={s}
+          className={`mini-bonus spice--${s}${bonuses[s] === 0 ? ' mini-bonus--zero' : ''}`}
+        >
+          {bonuses[s]}
+        </span>
+      ))}
+    </span>
+  );
+};
+
+const Tokens = ({ player }: { readonly player: PlayerPublic }) => (
+  <span
+    className="opp__row"
+    aria-label={`Tokens: ${TOKENS.map((t) => `${player.tokens[t]} ${SPICE_INFO[t].label}`).join(', ')}`}
+  >
+    {TOKENS.map((t) => (
+      <span
+        key={t}
+        className={`mini-bonus mini-token spice--${t}${player.tokens[t] === 0 ? ' mini-bonus--zero' : ''}`}
+      >
+        {player.tokens[t]}
+      </span>
+    ))}
+  </span>
+);
+
 export const Players = ({ onOpen }: StripProps) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
+  const stripRef = useRef<HTMLElement>(null);
+  const currentId = view && !view.finished ? currentOf(view)?.id : undefined;
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    const card = currentId
+      ? strip?.querySelector<HTMLElement>(`[data-player="${currentId}"]`)
+      : null;
+    if (!strip || !card) return;
+    const outside =
+      card.offsetLeft < strip.scrollLeft ||
+      card.offsetLeft + card.offsetWidth > strip.scrollLeft + strip.clientWidth;
+    if (outside) strip.scrollTo({ left: card.offsetLeft - strip.offsetLeft, behavior: 'smooth' });
+  }, [currentId]);
+
   if (!view) return null;
   const players = view.players;
-  const current = currentOf(view);
-  const many = players.length >= MANY_PLAYERS;
 
   return (
-    <section className={`opponents${many ? ' opponents--many' : ''}`} aria-label="Merchants">
+    <section
+      ref={stripRef}
+      className={`opponents${players.length <= 2 ? ' opponents--fit' : ''}`}
+      aria-label="Merchants"
+    >
       {players.map((p) => {
-        const bonuses = bonusesOf(p.cards);
         const mine = p.id === seatId;
         const name = mine ? 'You' : nameOf(room, p.id);
-        const active = current?.id === p.id && !view.finished;
+        const active = currentId === p.id;
         const status = statusOf(room, p.id);
         return (
           <button
             key={p.id}
             type="button"
             className={`opp${active ? ' opp--active' : ''}${mine ? ' opp--me' : ''}`}
+            data-player={p.id}
             data-anchor={mine ? undefined : anchors.player(p.id)}
             onClick={() => onOpen(p.id)}
             aria-label={`${name}, ${p.points} prestige${active ? ', playing now' : ''}`}
           >
             <span className="opp__head">
-              <Avatar
-                index={seatIndex(room, p.id)}
-                name={nameOf(room, p.id)}
-                size={many ? 20 : 22}
-              />
+              <Avatar index={seatIndex(room, p.id)} name={nameOf(room, p.id)} size={20} />
               <span className="opp__name">
                 {name}
                 {status && <span className="opp__away"> · {status}</span>}
               </span>
+              {p.reserved.length > 0 && (
+                <span className="opp__res" title="Reserved cards">
+                  {p.reserved.length}
+                </span>
+              )}
               <Points points={p.points} className="opp__points" />
             </span>
-            <span className="opp__meta">
-              {players.length <= BONUS_ROW_MAX_PLAYERS &&
-                SPICES.map((s) => (
-                  <span
-                    key={s}
-                    className={`mini-bonus spice--${s}${bonuses[s] === 0 ? ' mini-bonus--zero' : ''}`}
-                  >
-                    {bonuses[s]}
-                  </span>
-                ))}
-              <span className="opp__extra">
-                <span className="opp__tok" title="Tokens held">
-                  {totalTokens(p.tokens)}
-                </span>
-                {p.reserved.length > 0 && (
-                  <span className="opp__res" title="Reserved cards">
-                    {p.reserved.length}
-                  </span>
-                )}
-              </span>
-            </span>
+            <Discounts player={p} />
+            <Tokens player={p} />
           </button>
         );
       })}

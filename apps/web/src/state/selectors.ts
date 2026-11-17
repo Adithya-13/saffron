@@ -1,6 +1,6 @@
 import { SPICE_INFO, TIER_INFO } from '@saffron/content';
-import { TOKENS } from '@saffron/engine';
-import type { PlayerPublic, PlayerView, TokenCounts, VisibleEvent } from '@saffron/engine';
+import { TOKENS, bonusesOf, paymentFor } from '@saffron/engine';
+import type { Card, PlayerPublic, PlayerView, TokenCounts, VisibleEvent } from '@saffron/engine';
 import type { RoomSnapshot } from '@saffron/protocol';
 
 export const nameOf = (room: RoomSnapshot | null, id: string): string =>
@@ -17,6 +17,20 @@ export const currentOf = (view: PlayerView | null): PlayerPublic | null =>
 
 export const isMyTurn = (view: PlayerView | null, seatId: string | null): boolean =>
   Boolean(view && !view.finished && seatId && currentOf(view)?.id === seatId);
+
+export const canAfford = (player: PlayerPublic, card: Card): boolean =>
+  paymentFor(card.cost, bonusesOf(player.cards), player.tokens) !== null;
+
+export const buyersOf = (
+  view: PlayerView,
+  card: Card,
+  excludeId: string | null,
+): readonly PlayerPublic[] => view.players.filter((p) => p.id !== excludeId && canAfford(p, card));
+
+export const listNames = (names: readonly string[]): string =>
+  names.length <= 1
+    ? (names[0] ?? '')
+    : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
 
 const listTokens = (tokens: TokenCounts): string =>
   TOKENS.filter((t) => tokens[t] > 0)
