@@ -15,6 +15,21 @@ export const SFX = [
   'thunk',
   'pop',
   'victory',
+  'pick',
+  'unpick',
+  'cardOpen',
+  'tap',
+  'sheetOpen',
+  'sheetClose',
+  'tick',
+  'join',
+  'leave',
+  'shuffle',
+  'pause',
+  'resume',
+  'ask',
+  'yes',
+  'no',
 ] as const;
 export type SfxName = (typeof SFX)[number];
 

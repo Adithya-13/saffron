@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState } from 'react';
+import { useCue } from '../audio/useCue.ts';
 import { send } from '../net/socket.ts';
 import { nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
@@ -18,6 +19,13 @@ export const UndoBar = () => {
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
   const vote = room?.undoVote ?? null;
+  const undoAvailableTo = room?.undoAvailableTo ?? null;
+  useCue(vote?.requesterId ?? null, (before, after) => {
+    if (after !== null) return { name: 'ask', volume: 0.35 };
+    return before === undoAvailableTo
+      ? { name: 'no', volume: 0.35 }
+      : { name: 'yes', volume: 0.35 };
+  });
   const seconds = useSecondsLeft(vote?.expiresAt ?? null);
   const mustVote = Boolean(
     vote && seatId && vote.voters.includes(seatId) && !vote.approvals.includes(seatId),

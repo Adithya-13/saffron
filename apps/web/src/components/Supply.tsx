@@ -3,6 +3,7 @@ import { SPICES } from '@saffron/engine';
 import type { Spice } from '@saffron/engine';
 import { anchors } from '../anim/plan.ts';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
+import { play } from '../audio/sound.ts';
 import { canAddToDraft } from '../state/moves.ts';
 import { useStore } from '../state/store.ts';
 
@@ -21,11 +22,13 @@ export const Supply = ({ interactive }: { readonly interactive: boolean }) => {
     }
     if (canAddToDraft(legal, draft, spice)) {
       setDraft([...draft, spice]);
+      play('pick', { volume: 0.5 });
       return;
     }
     if (draft.includes(spice)) {
       const index = draft.lastIndexOf(spice);
       setDraft(draft.filter((_, i) => i !== index));
+      play('unpick', { volume: 0.4 });
       if (draft.length === 1) showToast('Two of a kind needs a pile of 4 or more');
       return;
     }

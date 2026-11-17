@@ -32,12 +32,31 @@ encode_audio() {
   ffmpeg -loglevel error -y -i "$input" -af "$filters" -ar 44100 -c:a aac -b:a 128k "$OUT/audio/${name}.m4a"
 }
 
-for file in "$SRC"/audio/*.mp3; do
-  name="$(basename "${file%.mp3}")"
+encode_audio "$SRC/audio/music.mp3" music -24 keep
+encode_audio "$SRC/audio/ambience.mp3" ambience -28 keep
+
+SFX_MEAN_DB=-20
+SFX_MAX_SECONDS=1.6
+
+mean_db() {
+  ffmpeg -hide_banner -i "$1" -af silenceremove=start_periods=1:start_threshold=-50dB,volumedetect \
+    -f null - 2>&1 | sed -n 's/.*mean_volume: \(-*[0-9.]*\) dB/\1/p'
+}
+
+encode_sfx() {
+  local input="$1" name="$2"
+  local gain
+  gain="$(echo "$SFX_MEAN_DB - $(mean_db "$input")" | bc -l)"
+  local filters="silenceremove=start_periods=1:start_threshold=-50dB,atrim=end=${SFX_MAX_SECONDS},afade=t=in:d=0.004,afade=t=out:st=$(echo "$SFX_MAX_SECONDS - 0.3" | bc -l):d=0.3,volume=${gain}dB,alimiter=limit=0.84:level=false"
+  ffmpeg -loglevel error -y -i "$input" -af "$filters" -ar 48000 -c:a libopus -b:a 96k "$OUT/audio/${name}.webm"
+  ffmpeg -loglevel error -y -i "$input" -af "$filters" -ar 44100 -c:a aac -b:a 128k "$OUT/audio/${name}.m4a"
+}
+
+for file in "$SRC"/sfx/*; do
+  name="$(basename "${file%.*}")"
   case "$name" in
-    music) encode_audio "$file" "$name" -24 keep ;;
-    ambience) encode_audio "$file" "$name" -28 keep ;;
-    *) encode_audio "$file" "$name" -20 trim ;;
+    victory) encode_audio "$file" "$name" -20 keep ;;
+    *) encode_sfx "$file" "$name" ;;
   esac
 done
 

@@ -25,6 +25,7 @@ import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Supply } from '../components/Supply.tsx';
 import { UndoBar } from '../components/UndoBar.tsx';
 import { Watchers } from '../components/Watchers.tsx';
+import { useCue } from '../audio/useCue.ts';
 import { useTurnRemaining } from '../state/clock.ts';
 import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
@@ -64,6 +65,13 @@ export const Table = () => {
   const guildIds = view?.guilds.map((g) => g.id).join(',') ?? '';
   const remaining = useTurnRemaining();
   const myTurn = isMyTurn(view, seatId);
+  const paused = room?.pausedAt != null;
+  const lowSecond =
+    myTurn && !paused && remaining !== null && remaining > 0 && remaining <= LOW_TIME_MS
+      ? Math.ceil(remaining / 1000)
+      : null;
+  useCue(lowSecond, (_, second) => (second === null ? null : { name: 'tick', volume: 0.5 }));
+  useCue(paused, (_, now) => ({ name: now ? 'pause' : 'resume', volume: 0.45 }));
 
   useEffect(() => {
     window.scrollTo(0, 0);

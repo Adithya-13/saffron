@@ -142,7 +142,7 @@ export const CardDetail = ({ me, interactive }: Props) => {
   })();
 
   return (
-    <Sheet title={title} onClose={close}>
+    <Sheet title={title} onClose={close} openSound="cardOpen">
       <div className="detail">
         <div className="detail__card fit">
           {card ? <Card card={card} /> : <CardBack tier={tier} />}

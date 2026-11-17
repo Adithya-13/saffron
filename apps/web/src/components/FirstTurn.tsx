@@ -57,6 +57,7 @@ export const FirstTurn = ({ onDone }: { readonly onDone: () => void }) => {
   }, [reduced, seats.length, target]);
 
   useEffect(() => {
+    play('shuffle', { volume: 0.5 });
     const timer = setTimeout(() => setOpen(false), START_INTRO_MS - FADE_MS);
     return () => clearTimeout(timer);
   }, []);

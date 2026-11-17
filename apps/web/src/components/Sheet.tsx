@@ -1,20 +1,32 @@
 import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { CloseIcon } from '../art/Icons.tsx';
+import { play } from '../audio/sound.ts';
+import type { SfxName } from '../audio/sound.ts';
 
 type Props = {
   readonly title: string;
   readonly onClose?: () => void;
   readonly tall?: boolean;
+  readonly openSound?: SfxName;
   readonly children: ReactNode;
 };
 
-export const Sheet = ({ title, onClose, tall = false, children }: Props) => {
+export const Sheet = ({
+  title,
+  onClose,
+  tall = false,
+  openSound = 'sheetOpen',
+  children,
+}: Props) => {
   const ref = useRef<HTMLDialogElement>(null);
+  const sound = useRef(openSound);
 
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
+    play(sound.current, { volume: 0.35 });
+    return () => play('sheetClose', { volume: 0.25 });
   }, []);
 
   return (

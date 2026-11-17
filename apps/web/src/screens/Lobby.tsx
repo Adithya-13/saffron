@@ -5,6 +5,7 @@ import { MAX_PLAYERS, MIN_PLAYERS } from '@saffron/engine';
 import { THEMES } from '@saffron/protocol';
 import type { SeatInfo, Theme } from '@saffron/protocol';
 import { navigate } from '../App.tsx';
+import { useCue } from '../audio/useCue.ts';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
 import { ChatPanel } from '../components/ChatPanel.tsx';
@@ -73,6 +74,9 @@ export const Lobby = () => {
   const showToast = useStore((s) => s.showToast);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
+  useCue(room?.seats.length ?? 0, (before, after) =>
+    after > before ? { name: 'join', volume: 0.45 } : { name: 'leave', volume: 0.4 },
+  );
   if (!room) return null;
 
   const isHost = seatId !== null && seatId === room.hostSeatId;
