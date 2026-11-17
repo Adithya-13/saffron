@@ -29,7 +29,7 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await ana.goto('/');
   await ana.getByLabel('Your merchant name').fill('Ana');
   await shot(ana, '01-home');
-  await ana.getByRole('button', { name: 'Host a new game' }).click();
+  await ana.getByRole('button', { name: 'Host a game' }).click();
   await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
   const roomUrl = ana.url();
 
@@ -142,7 +142,7 @@ test('a full game against a bot reaches the end screen', async ({ browser }) => 
   const page = await newPlayer(browser);
   await page.goto('/');
   await page.getByLabel('Your merchant name').fill('Dewi');
-  await page.getByRole('button', { name: 'Host a new game' }).click();
+  await page.getByRole('button', { name: 'Host a game' }).click();
   await page.getByRole('button', { name: 'Add a bot' }).click();
   await page.getByRole('button', { name: 'Open the market' }).click();
 
@@ -173,7 +173,7 @@ test('solo game against a bot advances automatically', async ({ browser }) => {
   const solo = await newPlayer(browser);
   await solo.goto('/');
   await solo.getByLabel('Your merchant name').fill('Citra');
-  await solo.getByRole('button', { name: 'Host a new game' }).click();
+  await solo.getByRole('button', { name: 'Host a game' }).click();
   await solo.getByRole('button', { name: 'Add a bot' }).click();
   await solo.getByRole('button', { name: 'Add a bot' }).click();
   await solo.getByRole('button', { name: 'Open the market' }).click();
@@ -190,7 +190,7 @@ test('host fills eight seats and picks a theme', async ({ browser }) => {
   const host = await newPlayer(browser);
   await host.goto('/');
   await host.getByLabel('Your merchant name').fill('Eka');
-  await host.getByRole('button', { name: 'Host a new game' }).click();
+  await host.getByRole('button', { name: 'Host a game' }).click();
   for (let i = 0; i < 7; i++) await host.getByRole('button', { name: 'Add a bot' }).click();
   await expect(host.locator('.seats .seat:not(.seat--open)')).toHaveCount(8);
   await expect(host.getByRole('button', { name: 'Add a bot' })).toBeDisabled();
@@ -208,7 +208,7 @@ const twoFriends = async (browser: Browser) => {
   const ana = await newPlayer(browser);
   await ana.goto('/');
   await ana.getByLabel('Your merchant name').fill('Ana');
-  await ana.getByRole('button', { name: 'Host a new game' }).click();
+  await ana.getByRole('button', { name: 'Host a game' }).click();
   await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
   const budi = await newPlayer(browser);
   await budi.goto(ana.url());
