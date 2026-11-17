@@ -112,15 +112,15 @@ const playOneTurn = async (page: Page): Promise<void> => {
     await guildChoice.first().click();
     return;
   }
-  const affordableCard = page
-    .locator(
-      '.market button.card.card--affordable, .market__row--reserve button.card.card--affordable',
-    )
-    .last();
-  if ((await affordableCard.count()) > 0) {
-    await affordableCard.click();
-    await page.getByRole('button', { name: 'Buy' }).click();
-    return;
+  const cards = page.locator('.market button.card');
+  for (let i = (await cards.count()) - 1; i >= 0; i--) {
+    await cards.nth(i).click();
+    const buy = page.getByRole('button', { name: 'Buy', exact: true });
+    if (await buy.isVisible()) {
+      await buy.click();
+      return;
+    }
+    await page.getByRole('button', { name: 'Close' }).click();
   }
   const pile = page.locator('button.pile.pile--available');
   if ((await pile.count()) > 0) {

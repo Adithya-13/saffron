@@ -21,12 +21,6 @@ export const isMyTurn = (view: PlayerView | null, seatId: string | null): boolea
 export const canAfford = (player: PlayerPublic, card: Card): boolean =>
   paymentFor(card.cost, bonusesOf(player.cards), player.tokens) !== null;
 
-export const buyersOf = (
-  view: PlayerView,
-  card: Card,
-  excludeId: string | null,
-): readonly PlayerPublic[] => view.players.filter((p) => p.id !== excludeId && canAfford(p, card));
-
 export const listNames = (names: readonly string[]): string =>
   names.length <= 1
     ? (names[0] ?? '')

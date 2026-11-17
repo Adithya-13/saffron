@@ -1,21 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { SPICES, TIERS } from '@saffron/engine';
-import { CARDS, GUILDS } from './index.ts';
+import { CARDS, GUILDS, REPRINT } from './index.ts';
+
+const BIG_TABLE = [...CARDS, ...REPRINT];
 
 const totalCost = (cost: Record<string, number>): number =>
   Object.values(cost).reduce((a, b) => a + b, 0);
 
 describe('deck', () => {
-  it('has unique ids and identical cost profiles never repeat within a tier', () => {
-    expect(new Set(CARDS.map((c) => c.id)).size).toBe(CARDS.length);
-    const keys = CARDS.map((c) => `${c.tier}:${c.bonus}:${SPICES.map((s) => c.cost[s]).join(',')}`);
-    expect(new Set(keys).size).toBe(CARDS.length);
+  it('never repeats an id or a card, even with the reprint on big tables', () => {
+    expect(REPRINT).toHaveLength(CARDS.length);
+    expect(new Set(BIG_TABLE.map((c) => c.id)).size).toBe(BIG_TABLE.length);
+    const keys = BIG_TABLE.map(
+      (c) => `${c.tier}:${c.bonus}:${SPICES.map((s) => c.cost[s]).join(',')}`,
+    );
+    expect(new Set(keys).size).toBe(BIG_TABLE.length);
+  });
+
+  it('gives the reprint the same points and total cost as the first printing', () => {
+    const profile = (cards: typeof CARDS) =>
+      cards.map((c) => `${c.tier}:${c.bonus}:${c.points}:${totalCost(c.cost)}`).sort();
+    expect(profile(REPRINT)).toEqual(profile(CARDS));
   });
 
   it('is colour-symmetric within each tier', () => {
     for (const tier of TIERS) {
       const counts = SPICES.map(
-        (s) => CARDS.filter((c) => c.tier === tier && c.bonus === s).length,
+        (s) => BIG_TABLE.filter((c) => c.tier === tier && c.bonus === s).length,
       );
       expect(new Set(counts).size).toBe(1);
     }
@@ -27,7 +38,7 @@ describe('deck', () => {
       2: { cost: [5, 8], points: [1, 3] },
       3: { cost: [7, 14], points: [3, 5] },
     };
-    for (const card of CARDS) {
+    for (const card of BIG_TABLE) {
       const band = bands[card.tier];
       const cost = totalCost(card.cost);
       expect(cost).toBeGreaterThanOrEqual(band.cost[0] as number);

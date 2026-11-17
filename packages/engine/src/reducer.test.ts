@@ -32,6 +32,9 @@ const catalog: Catalog = {
   cards: TIERS.flatMap((tier) =>
     SPICES.flatMap((bonus) => [0, 1].map((i) => card(tier, bonus, i, { saffron: tier }, tier))),
   ),
+  reprint: TIERS.flatMap((tier) =>
+    SPICES.flatMap((bonus) => [2, 3].map((i) => card(tier, bonus, i, { cardamom: tier }, tier))),
+  ),
   guilds: [
     guild('g1', { saffron: 1 }),
     guild('g2', { cardamom: 1 }),

@@ -34,6 +34,7 @@ export type Guild = {
 
 export type Catalog = {
   readonly cards: readonly Card[];
+  readonly reprint: readonly Card[];
   readonly guilds: readonly Guild[];
 };
 

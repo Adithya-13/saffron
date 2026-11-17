@@ -22,8 +22,7 @@ export const RulesSheet = ({ onClose }: { onClose: () => void }) => {
           </li>
           <li>
             <strong>Reserve a card</strong> and take a Royal Seal. Seals are wild. You can hold 3
-            reserved cards. Tip: tap a deck on the left of the market to reserve its top card blind,
-            so others cannot see what you are building.
+            reserved cards. You can also reserve the top card of a deck without seeing it.
           </li>
           <li>
             <strong>Buy a card</strong> from the market or your reserve.

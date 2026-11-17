@@ -18,7 +18,7 @@ export const describeCard = (card: CardData): string => {
 
 type CardProps = {
   readonly card: CardData;
-  readonly state?: 'affordable' | 'selected' | 'idle';
+  readonly state?: 'selected' | 'idle';
   readonly onClick?: () => void;
   readonly label?: string;
 };

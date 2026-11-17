@@ -1,10 +1,10 @@
 import { SPICE_INFO, TIER_INFO } from '@saffron/content';
-import { MAX_RESERVED, SPICES, TOKENS, bonusesOf, deficitFor, paymentFor } from '@saffron/engine';
+import { MAX_RESERVED, SPICES, TOKENS, bonusesOf, paymentFor } from '@saffron/engine';
 import type { Card as CardData, Move, PlayerPublic, PlayerView, Tier } from '@saffron/engine';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { send } from '../net/socket.ts';
 import { buyMove, isLegal, reserveMove } from '../state/moves.ts';
-import { buyersOf, listNames, nameOf } from '../state/selectors.ts';
+import { nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import type { Selection } from '../state/store.ts';
 import { Card, CardBack } from './Card.tsx';
@@ -65,38 +65,23 @@ const resolve = (
 const Payment = ({ card, me }: { readonly card: CardData; readonly me: PlayerPublic }) => {
   const bonuses = bonusesOf(me.cards);
   const payment = paymentFor(card.cost, bonuses, me.tokens);
-  if (payment) {
-    const spent = TOKENS.filter((t) => payment[t] > 0);
-    return (
-      <div className="detail__fact">
-        <dt>You pay</dt>
-        <dd>
-          {spent.length === 0
-            ? 'Nothing, your cards cover it'
-            : spent.map((t) =>
-                t === 'seal' ? (
-                  <span key={t} className="pip spice--seal" aria-label={`${payment.seal} seal`}>
-                    {payment.seal}
-                  </span>
-                ) : (
-                  <CostPip key={t} spice={t} amount={payment[t]} />
-                ),
-              )}
-        </dd>
-      </div>
-    );
-  }
-  const deficit = deficitFor(card.cost, bonuses, me.tokens);
-  const missing = SPICES.filter((s) => deficit[s] > 0);
-  const total = missing.reduce((sum, s) => sum + deficit[s], 0) - me.tokens.seal;
+  if (!payment) return null;
+  const spent = TOKENS.filter((t) => payment[t] > 0);
   return (
     <div className="detail__fact">
-      <dt>You still need</dt>
+      <dt>You pay</dt>
       <dd>
-        {missing.map((s) => (
-          <CostPip key={s} spice={s} amount={deficit[s]} />
-        ))}
-        {me.tokens.seal > 0 && <span className="muted small">({total} after seals)</span>}
+        {spent.length === 0
+          ? 'Nothing, your cards cover it'
+          : spent.map((t) =>
+              t === 'seal' ? (
+                <span key={t} className="pip spice--seal" aria-label={`${payment.seal} seal`}>
+                  {payment.seal}
+                </span>
+              ) : (
+                <CostPip key={t} spice={t} amount={payment[t]} />
+              ),
+            )}
       </dd>
     </div>
   );
@@ -123,7 +108,6 @@ export const CardDetail = ({ me, interactive }: Props) => {
   const canReserve = interactive && reserve !== null && isLegal(legal, reserve);
   const reserveFull = (me?.reserved.length ?? 0) >= MAX_RESERVED;
   const close = () => select(null);
-  const rivals = card ? buyersOf(view, card, seatId) : [];
   const submit = (move: Move) => {
     send({ type: 'move', move });
     close();
@@ -169,13 +153,7 @@ export const CardDetail = ({ me, interactive }: Props) => {
                 ))}
               </dd>
             </div>
-            {me && (!owner || owner === seatId) && <Payment card={card} me={me} />}
-            {!owner && rivals.length > 0 && (
-              <div className="detail__fact">
-                <dt>Can buy it now</dt>
-                <dd>{listNames(rivals.map((p) => nameOf(room, p.id)))}</dd>
-              </div>
-            )}
+            {me && interactive && (!owner || owner === seatId) && <Payment card={card} me={me} />}
           </dl>
         ) : (
           <div className="detail__blind">

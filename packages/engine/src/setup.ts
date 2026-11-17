@@ -50,12 +50,8 @@ export const supplyFor = (playerCount: number): TokenCounts => {
   };
 };
 
-const COPY_SUFFIXES = ['', '-b', '-c'] as const;
-
-export const printDeck = (cards: readonly Card[], copies: number): readonly Card[] =>
-  COPY_SUFFIXES.slice(0, copies).flatMap((suffix) =>
-    cards.map((card) => ({ ...card, id: `${card.id}${suffix}` })),
-  );
+export const printDeck = (catalog: Catalog, copies: number): readonly Card[] =>
+  copies > 1 ? [...catalog.cards, ...catalog.reprint] : catalog.cards;
 
 const newPlayer = (id: string): PlayerState => ({
   id,
@@ -87,7 +83,7 @@ export const createGame = (
   if (new Set(playerIds).size !== playerIds.length) throw new Error('Duplicate player ids');
 
   const rules = rulesFor(playerIds.length);
-  const cards = printDeck(catalog.cards, rules.deckCopies);
+  const cards = printDeck(catalog, rules.deckCopies);
   let rng = seedRng(seed);
   const decks: Partial<Record<Tier, readonly Card[]>> = {};
   const market: Partial<Record<Tier, MarketRow>> = {};
