@@ -259,3 +259,31 @@ test('host removes a player mid-game and a bot takes over', async ({ browser }) 
   await expect(ana.getByRole('button', { name: /^Budi \(bot\), \d+ prestige/ })).toBeVisible();
   await waitForMyTurn(ana);
 });
+
+test('a guest leaves the lobby and the host closes the room', async ({ browser }) => {
+  const ana = await newPlayer(browser);
+  await ana.goto('/');
+  await ana.getByLabel('Your merchant name').fill('Ana');
+  await ana.getByRole('button', { name: 'Host a game' }).click();
+  await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
+  const roomUrl = ana.url();
+  const budi = await newPlayer(browser);
+  await budi.goto(roomUrl);
+  await budi.getByLabel('Your merchant name').fill('Budi');
+  await budi.getByRole('button', { name: 'Enter' }).click();
+  await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
+
+  await budi.getByRole('button', { name: 'Leave room' }).click();
+  await expect(budi).toHaveURL(/\/$/);
+  await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeHidden();
+
+  await budi.goto(roomUrl);
+  await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
+  await ana.getByRole('button', { name: 'Close room' }).click();
+  await shot(ana, '12-close-confirm');
+  await ana.getByRole('button', { name: 'Close room' }).click();
+  await expect(ana.getByText('The host closed this room for everyone.')).toBeVisible();
+  await expect(budi.getByText('The host closed this room for everyone.')).toBeVisible();
+  await budi.goto(roomUrl);
+  await expect(budi.getByText('Room not found')).toBeVisible({ timeout: 20_000 });
+});

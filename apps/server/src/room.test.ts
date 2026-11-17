@@ -340,3 +340,11 @@ describe('kick and leave', () => {
     expect(outcome.room.hostSeatId).toBe(b.seatId);
   });
 });
+
+describe('close room', () => {
+  it('lets only the host close the room', () => {
+    const { room, a, b } = twoHumans();
+    expect(send(room, b, { type: 'closeRoom' }).close).toBeUndefined();
+    expect(send(room, a, { type: 'closeRoom' }).close).toBe(true);
+  });
+});

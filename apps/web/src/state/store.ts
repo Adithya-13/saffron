@@ -58,7 +58,7 @@ type State = {
   readonly selection: Selection;
   readonly toast: Toast | null;
   readonly serverOffset: number;
-  readonly kicked: boolean;
+  readonly removed: 'kicked' | 'closed' | null;
 };
 
 type Actions = {
@@ -105,7 +105,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
   selection: null,
   toast: null,
   serverOffset: 0,
-  kicked: false,
+  removed: null,
 
   setCode: (code) =>
     set({
@@ -116,7 +116,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
       chat: [],
       log: [],
       seatId: null,
-      kicked: false,
+      removed: null,
     }),
   setConnection: (connection) => set({ connection }),
 
@@ -144,7 +144,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
         get().showToast(ERROR_TEXT[message.code] ?? 'That move is not allowed', 'error');
         return;
       case 'kicked':
-        set({ kicked: true });
+      case 'closed':
+        set({ removed: message.type });
         return;
     }
   },

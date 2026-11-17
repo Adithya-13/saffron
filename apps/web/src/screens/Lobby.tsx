@@ -4,9 +4,11 @@ import { GAME_NAME } from '@saffron/content';
 import { MAX_PLAYERS, MIN_PLAYERS } from '@saffron/engine';
 import { THEMES } from '@saffron/protocol';
 import type { Theme } from '@saffron/protocol';
+import { navigate } from '../App.tsx';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
 import { ChatPanel } from '../components/ChatPanel.tsx';
+import { ConfirmAction } from '../components/ConfirmAction.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Avatar } from '../components/Avatar.tsx';
 import { CloseIcon } from '../art/Icons.tsx';
@@ -53,6 +55,11 @@ export const Lobby = () => {
   const isHost = seatId !== null && seatId === room.hostSeatId;
   const canStart = isHost && room.seats.length >= MIN_PLAYERS;
   const openSeats = MAX_PLAYERS - room.seats.length;
+
+  const leave = () => {
+    send({ type: 'leave' });
+    navigate('/');
+  };
 
   const copyLink = async () => {
     try {
@@ -147,9 +154,25 @@ export const Lobby = () => {
         {isHost && room.seats.length < MIN_PLAYERS && (
           <p className="muted small">Share the link, or add a bot to play right away.</p>
         )}
-        <button className="link-btn" type="button" onClick={() => setRulesOpen(true)}>
-          How to play
-        </button>
+        <div className="lobby__footer">
+          <button className="link-btn" type="button" onClick={() => setRulesOpen(true)}>
+            How to play
+          </button>
+          {seatId !== null && (
+            <button className="link-btn" type="button" onClick={leave}>
+              Leave room
+            </button>
+          )}
+          {isHost && (
+            <ConfirmAction
+              label="Close room"
+              prompt="Close this room? Everyone is sent back home and the link stops working."
+              confirmLabel="Close room"
+              triggerClassName="link-btn link-btn--danger"
+              onConfirm={() => send({ type: 'closeRoom' })}
+            />
+          )}
+        </div>
       </section>
       <aside className="lobby__chat panel">
         <ChatPanel />

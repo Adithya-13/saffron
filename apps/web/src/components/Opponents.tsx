@@ -1,5 +1,4 @@
 import { motion } from 'motion/react';
-import { useState } from 'react';
 import { SPICE_INFO } from '@saffron/content';
 import { SPICES, TOKENS, bonusesOf, totalTokens } from '@saffron/engine';
 import type { RoomSnapshot } from '@saffron/protocol';
@@ -10,6 +9,7 @@ import { currentOf, nameOf, seatIndex } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import { Avatar } from './Avatar.tsx';
 import { Card, CardBack } from './Card.tsx';
+import { ConfirmAction } from './ConfirmAction.tsx';
 import { GuildChip } from './Guilds.tsx';
 import { Sheet } from './Sheet.tsx';
 
@@ -104,40 +104,6 @@ export const Players = ({ onOpen }: StripProps) => {
 
 type DetailProps = { readonly playerId: string; readonly onClose: () => void };
 
-const RemovePlayer = ({ name, onRemove }: { name: string; onRemove: () => void }) => {
-  const [confirming, setConfirming] = useState(false);
-  if (!confirming) {
-    return (
-      <button
-        className="btn btn--ghost btn--small"
-        type="button"
-        onClick={() => setConfirming(true)}
-      >
-        Remove from game
-      </button>
-    );
-  }
-  return (
-    <div className="confirm">
-      <p className="small">
-        Remove {name}? A bot takes over their stall and they can't rejoin this game.
-      </p>
-      <span className="confirm__actions">
-        <button
-          className="btn btn--ghost btn--small"
-          type="button"
-          onClick={() => setConfirming(false)}
-        >
-          Cancel
-        </button>
-        <button className="btn btn--danger btn--small" type="button" onClick={onRemove}>
-          Remove
-        </button>
-      </span>
-    </div>
-  );
-};
-
 export const PlayerDetail = ({ playerId, onClose }: DetailProps) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
@@ -217,9 +183,12 @@ export const PlayerDetail = ({ playerId, onClose }: DetailProps) => {
           </div>
         )}
         {canRemove && (
-          <RemovePlayer
-            name={name}
-            onRemove={() => {
+          <ConfirmAction
+            label="Remove from game"
+            prompt={`Remove ${name}? A bot takes over their stall and they can't rejoin this game.`}
+            confirmLabel="Remove"
+            triggerClassName="btn btn--ghost btn--small"
+            onConfirm={() => {
               send({ type: 'removeSeat', seatId: player.id });
               onClose();
             }}

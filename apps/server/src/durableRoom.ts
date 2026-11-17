@@ -97,7 +97,20 @@ export class Room extends DurableObject {
     await this.apply(disconnect(room, seatId, Date.now()), null);
   }
 
+  private async close(): Promise<void> {
+    for (const ws of this.ctx.getWebSockets()) {
+      send(ws, { type: 'closed' });
+      ws.close(1000, 'Room closed');
+    }
+    await this.ctx.storage.deleteAlarm();
+    await this.ctx.storage.deleteAll();
+  }
+
   private async apply(outcome: Outcome, sender: WebSocket | null): Promise<void> {
+    if (outcome.close) {
+      await this.close();
+      return;
+    }
     const { room } = outcome;
     await this.ctx.storage.put(ROOM_KEY, room);
 

@@ -81,6 +81,7 @@ export type Outcome = {
   readonly chat: readonly ChatMessage[];
   readonly bind?: string | null;
   readonly kick?: string;
+  readonly close?: boolean;
 };
 
 const unchanged = (room: RoomState, replies: readonly ServerMessage[] = []): Outcome => ({
@@ -293,6 +294,9 @@ const removeSeat = (
     systemChat(ctx, `The host removed ${seat.name}. A bot takes over their stall`),
   );
 };
+
+const closeRoom = (room: RoomState, senderId: string): Outcome =>
+  senderId === room.hostSeatId ? { ...unchanged(room), close: true } : failure(room, 'notHost');
 
 const leave = (room: RoomState, senderId: string, ctx: Ctx): Outcome => {
   const seat = seatOf(room, senderId);
@@ -547,6 +551,8 @@ const route = (room: RoomState, senderId: string | null, msg: ClientMessage, ctx
       return resume(room, senderId);
     case 'leave':
       return leave(room, senderId, ctx);
+    case 'closeRoom':
+      return closeRoom(room, senderId);
     case 'chat':
       return chat(room, senderId, msg.text, ctx);
     case 'undoRequest':

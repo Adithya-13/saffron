@@ -24,7 +24,8 @@ export type ClientMessage =
   | { readonly type: 'rematch' }
   | { readonly type: 'stillHere' }
   | { readonly type: 'resume' }
-  | { readonly type: 'leave' };
+  | { readonly type: 'leave' }
+  | { readonly type: 'closeRoom' };
 
 export type SeatKind = 'human' | 'bot';
 
@@ -92,4 +93,5 @@ export type ServerMessage =
     }
   | { readonly type: 'chat'; readonly messages: readonly ChatMessage[]; readonly replace: boolean }
   | { readonly type: 'error'; readonly code: ErrorCode }
-  | { readonly type: 'kicked' };
+  | { readonly type: 'kicked' }
+  | { readonly type: 'closed' };

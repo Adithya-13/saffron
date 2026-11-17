@@ -64,11 +64,16 @@ const Connecting = ({ failed }: { failed: boolean }) => (
   </main>
 );
 
-const Kicked = () => (
+const REMOVED_TEXT = {
+  kicked: { title: 'Removed from the table', body: 'The host removed you from this table.' },
+  closed: { title: 'The room is closed', body: 'The host closed this room for everyone.' },
+} as const;
+
+const Removed = ({ reason }: { readonly reason: keyof typeof REMOVED_TEXT }) => (
   <main className="center-screen">
     <div className="panel connecting">
-      <h1>Removed from the table</h1>
-      <p>The host removed you from this table.</p>
+      <h1>{REMOVED_TEXT[reason].title}</h1>
+      <p>{REMOVED_TEXT[reason].body}</p>
       <button className="btn btn--primary" type="button" onClick={() => navigate('/')}>
         Back to the bazaar
       </button>
@@ -80,7 +85,7 @@ export const RoomScreen = ({ code }: { code: string }) => {
   const [hasName, setHasName] = useState(() => loadName().trim().length > 0);
   const connection = useStore((s) => s.connection);
   const room = useStore((s) => s.room);
-  const kicked = useStore((s) => s.kicked);
+  const removed = useStore((s) => s.removed);
   const reconnecting = connection === 'reconnecting';
   useRoomTheme(room?.theme);
 
@@ -91,7 +96,7 @@ export const RoomScreen = ({ code }: { code: string }) => {
   }, [code, hasName]);
 
   if (!hasName) return <NamePrompt onDone={() => setHasName(true)} />;
-  if (kicked) return <Kicked />;
+  if (removed) return <Removed reason={removed} />;
   if (!room) {
     return (
       <>

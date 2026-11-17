@@ -733,6 +733,22 @@ h3 {
   flex: 1;
 }
 
+.lobby__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.lobby__footer .confirm {
+  flex-basis: 100%;
+}
+
+.link-btn--danger,
+.menu .menu__item--danger {
+  color: var(--danger);
+}
+
 .lobby__chat {
   padding: 14px;
   display: flex;

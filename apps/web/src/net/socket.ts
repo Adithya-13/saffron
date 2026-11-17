@@ -23,7 +23,7 @@ const socketUrl = (code: string): string => {
 const handle = (code: string, message: ServerMessage): void => {
   if (message.type === 'welcome' && message.token) saveToken(code, message.token);
   useStore.getState().receive(message);
-  if (message.type === 'kicked') disconnect();
+  if (message.type === 'kicked' || message.type === 'closed') disconnect();
 };
 
 const open = (current: Session): void => {

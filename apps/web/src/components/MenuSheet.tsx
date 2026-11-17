@@ -1,7 +1,7 @@
-import { useState } from 'react';
 import { navigate } from '../App.tsx';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
+import { ConfirmAction } from './ConfirmAction.tsx';
 import { Sheet } from './Sheet.tsx';
 
 type Props = {
@@ -17,7 +17,7 @@ export const MenuSheet = ({ onClose, onRules, onSound }: Props) => {
   const showToast = useStore((s) => s.showToast);
   const status = useStore((s) => s.room?.status);
   const seated = useStore((s) => s.seatId !== null);
-  const [confirmLeave, setConfirmLeave] = useState(false);
+  const isHost = useStore((s) => s.seatId !== null && s.seatId === s.room?.hostSeatId);
   const handsSeat = seated && status !== 'finished';
 
   const leave = () => {
@@ -53,32 +53,28 @@ export const MenuSheet = ({ onClose, onRules, onSound }: Props) => {
         <button className="menu__item" type="button" onClick={onSound}>
           Sound
         </button>
-        {confirmLeave ? (
-          <div className="confirm">
-            <p className="small">
-              Leave this game? A bot takes over your stall and you can't come back to it.
-            </p>
-            <span className="confirm__actions">
-              <button
-                className="btn btn--ghost btn--small"
-                type="button"
-                onClick={() => setConfirmLeave(false)}
-              >
-                Stay
-              </button>
-              <button className="btn btn--danger btn--small" type="button" onClick={leave}>
-                Leave game
-              </button>
-            </span>
-          </div>
+        {handsSeat && status === 'playing' ? (
+          <ConfirmAction
+            label="Leave table"
+            prompt="Leave this game? A bot takes over your stall and you can't come back to it."
+            confirmLabel="Leave game"
+            cancelLabel="Stay"
+            triggerClassName="menu__item"
+            onConfirm={leave}
+          />
         ) : (
-          <button
-            className="menu__item"
-            type="button"
-            onClick={() => (handsSeat && status === 'playing' ? setConfirmLeave(true) : leave())}
-          >
+          <button className="menu__item" type="button" onClick={leave}>
             Leave table
           </button>
+        )}
+        {isHost && (
+          <ConfirmAction
+            label="Close room for everyone"
+            prompt="Close this room? Everyone is sent back home and the game ends for good."
+            confirmLabel="Close room"
+            triggerClassName="menu__item menu__item--danger"
+            onConfirm={() => send({ type: 'closeRoom' })}
+          />
         )}
       </div>
     </Sheet>
