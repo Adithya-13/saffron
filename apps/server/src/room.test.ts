@@ -146,12 +146,20 @@ describe('lobby', () => {
     expect(upgraded.autopilot).toEqual([]);
   });
 
-  it('turns late joiners into spectators once full or started', () => {
+  it('turns late joiners into viewers once full or started', () => {
     const { room } = twoHumans();
     const late = send(room, null, { type: 'join', name: 'Citra' });
-    expect(late.replies[0]).toEqual({ type: 'welcome', seatId: null, token: null });
+    const welcome = late.replies[0];
+    expect(welcome).toMatchObject({ type: 'welcome', seatId: null });
+    if (welcome?.type !== 'welcome' || !welcome.viewerId) throw new Error('no viewer');
+    expect(late.bind).toBe(welcome.viewerId);
     expect(late.room.seats).toHaveLength(2);
-    expect(syncFor(late.room, null, [], 0)).toMatchObject({ type: 'sync', legal: [] });
+    expect(late.room.viewers.map((v) => v.name)).toEqual(['Citra']);
+    expect(syncFor(late.room, welcome.viewerId, [], 0)).toMatchObject({
+      type: 'sync',
+      legal: [],
+      room: { viewers: [{ id: welcome.viewerId, name: 'Citra' }] },
+    });
   });
 
   it('rejects messages from sockets that have not joined', () => {
@@ -159,6 +167,104 @@ describe('lobby', () => {
       type: 'error',
       code: 'notJoined',
     });
+  });
+});
+
+const watchAs = (
+  room: RoomState,
+  name: string,
+): { room: RoomState; viewerId: string; token: string } => {
+  const outcome = send(room, null, { type: 'join', name, watch: true });
+  const welcome = outcome.replies[0];
+  if (welcome?.type !== 'welcome' || !welcome.viewerId || !welcome.token)
+    throw new Error('no viewer');
+  return { room: outcome.room, viewerId: welcome.viewerId, token: welcome.token };
+};
+
+describe('viewers', () => {
+  it('lets someone watch the lobby without taking a seat', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const v = watchAs(a.room, 'Vera');
+    expect(v.room.seats).toHaveLength(1);
+    expect(v.room.viewers).toHaveLength(1);
+    expect(v.room.chat.at(-1)?.text).toBe('Vera is watching');
+  });
+
+  it('lets viewers chat, tagged as watching, with the same cooldown', () => {
+    const { room } = twoHumans();
+    const v = watchAs(room, 'Vera');
+    const said = send(v.room, v.viewerId, { type: 'chat', text: 'go Ana' }, 5_000);
+    expect(said.chat).toEqual([
+      expect.objectContaining({ seatId: v.viewerId, name: 'Vera', text: 'go Ana', watching: true }),
+    ]);
+    expect(errorOf(send(said.room, v.viewerId, { type: 'chat', text: 'again' }, 5_100))).toEqual({
+      type: 'error',
+      code: 'rateLimited',
+    });
+  });
+
+  it('keeps viewers out of play and host actions', () => {
+    const { room } = twoHumans();
+    const v = watchAs(room, 'Vera');
+    const move = { type: 'move', move: { type: 'takeDouble', spice: 'salt' } } as const;
+    expect(errorOf(send(v.room, v.viewerId, move))).toBeDefined();
+    expect(errorOf(send(v.room, v.viewerId, { type: 'undoRequest' }))).toBeDefined();
+    expect(errorOf(send(v.room, v.viewerId, { type: 'closeRoom' }))).toEqual({
+      type: 'error',
+      code: 'notHost',
+    });
+    expect(errorOf(send(v.room, v.viewerId, { type: 'takeSeat' }))).toEqual({
+      type: 'error',
+      code: 'notInLobby',
+    });
+  });
+
+  it('reconnects a viewer by token and hides them while away', () => {
+    const v = watchAs(createRoom('ABCDE', 1), 'Vera');
+    const away = disconnect(v.room, v.viewerId, 0).room;
+    expect(syncFor(away, null, [], 0)).toMatchObject({ room: { viewers: [] } });
+    const back = send(away, null, { type: 'join', name: 'x', token: v.token });
+    expect(back.bind).toBe(v.viewerId);
+    expect(back.room.viewers).toHaveLength(1);
+    expect(back.room.viewers[0]?.connected).toBe(true);
+  });
+
+  it('moves a viewer into an open lobby seat, keeping their token', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const v = watchAs(a.room, 'Vera');
+    const seated = send(v.room, v.viewerId, { type: 'takeSeat' });
+    expect(seated.replies[0]).toEqual({
+      type: 'welcome',
+      seatId: v.viewerId,
+      viewerId: null,
+      token: v.token,
+    });
+    expect(seated.room.viewers).toHaveLength(0);
+    expect(seated.room.seats.map((s) => s.name)).toEqual(['Ana', 'Vera']);
+    const back = send(seated.room, null, { type: 'join', name: 'x', token: v.token });
+    expect(back.bind).toBe(v.viewerId);
+    expect(back.room.seats).toHaveLength(2);
+  });
+
+  it('lets only the host remove a viewer', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const b = joinAs(a.room, 'Budi');
+    const v = watchAs(b.room, 'Vera');
+    const remove = { type: 'removeSeat', seatId: v.viewerId } as const;
+    expect(errorOf(send(v.room, b.seatId, remove))).toEqual({ type: 'error', code: 'notHost' });
+    expect(errorOf(send(v.room, v.viewerId, remove))).toEqual({ type: 'error', code: 'notHost' });
+    const removed = send(v.room, a.seatId, remove);
+    expect(removed.kick).toBe(v.viewerId);
+    expect(removed.room.viewers).toHaveLength(0);
+    const back = send(removed.room, null, { type: 'join', name: 'Vera', token: v.token });
+    expect(back.room.viewers.map((x) => x.id)).not.toContain(v.viewerId);
+  });
+
+  it('drops a viewer from the list when they leave', () => {
+    const v = watchAs(createRoom('ABCDE', 1), 'Vera');
+    const left = send(v.room, v.viewerId, { type: 'leave' });
+    expect(left.bind).toBeNull();
+    expect(left.room.viewers).toHaveLength(0);
   });
 });
 

@@ -22,6 +22,7 @@ import { Sheet } from '../components/Sheet.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Supply } from '../components/Supply.tsx';
 import { UndoBar } from '../components/UndoBar.tsx';
+import { Watchers } from '../components/Watchers.tsx';
 import { useTurnRemaining } from '../state/clock.ts';
 import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
@@ -172,6 +173,7 @@ export const Table = () => {
       )}
       {panel?.kind === 'chat' && (
         <Sheet title="Chat" onClose={close} tall>
+          <Watchers />
           <ChatPanel />
         </Sheet>
       )}

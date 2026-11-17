@@ -36,7 +36,7 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   const budi = await newPlayer(browser);
   await budi.goto(roomUrl);
   await budi.getByLabel('Your merchant name').fill('Budi');
-  await budi.getByRole('button', { name: 'Enter' }).click();
+  await budi.getByRole('button', { name: 'Take a seat' }).click();
 
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
   await shot(ana, '02-lobby');
@@ -213,7 +213,7 @@ const twoFriends = async (browser: Browser) => {
   const budi = await newPlayer(browser);
   await budi.goto(ana.url());
   await budi.getByLabel('Your merchant name').fill('Budi');
-  await budi.getByRole('button', { name: 'Enter' }).click();
+  await budi.getByRole('button', { name: 'Take a seat' }).click();
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
   await ana.getByRole('button', { name: 'Open the market' }).click();
   await waitForMyTurn(ana);
@@ -270,7 +270,7 @@ test('a guest leaves the lobby and the host closes the room', async ({ browser }
   const budi = await newPlayer(browser);
   await budi.goto(roomUrl);
   await budi.getByLabel('Your merchant name').fill('Budi');
-  await budi.getByRole('button', { name: 'Enter' }).click();
+  await budi.getByRole('button', { name: 'Take a seat' }).click();
   await expect(ana.locator('.seat__name', { hasText: 'Budi' })).toBeVisible();
 
   await budi.locator('.theme-pick__option', { hasText: 'Harbour' }).click();
@@ -290,4 +290,53 @@ test('a guest leaves the lobby and the host closes the room', async ({ browser }
   await expect(budi.getByText('The host closed this room for everyone.')).toBeVisible();
   await budi.goto(roomUrl);
   await expect(budi.getByText('Room not found')).toBeVisible({ timeout: 20_000 });
+});
+
+test('a viewer watches, chats and then takes a seat', async ({ browser }) => {
+  const ana = await newPlayer(browser);
+  await ana.goto('/');
+  await ana.getByLabel('Your merchant name').fill('Ana');
+  await ana.getByRole('button', { name: 'Host a game' }).click();
+  await expect(ana).toHaveURL(/\/r\/[A-Z0-9]{5}$/);
+  const code = ana.url().slice(-5);
+
+  const vera = await newPlayer(browser);
+  await vera.goto('/');
+  await vera.getByLabel('Your merchant name').fill('Vera');
+  await vera.getByLabel('Room code').fill(code);
+  await vera.getByRole('button', { name: 'Watch', exact: true }).click();
+  await expect(vera.locator('.lobby__watching')).toBeVisible();
+  await expect(ana.locator('.watchers')).toContainText('Watching: 1');
+  await expect(ana.locator('.watchers')).toContainText('Vera');
+  await expect(ana.locator('.seat__name', { hasText: 'Vera' })).toHaveCount(0);
+
+  await vera.getByLabel('Chat message').fill('Hi from the crowd');
+  await vera.getByRole('button', { name: 'Send' }).click();
+  const line = ana.locator('.chat__msg', { hasText: 'Hi from the crowd' });
+  await expect(line.locator('.chat__watching')).toBeVisible();
+  await shot(vera, '13-viewer-lobby');
+
+  await vera.getByRole('button', { name: 'Take a seat' }).click();
+  await expect(ana.locator('.seat__name', { hasText: 'Vera' })).toBeVisible();
+  await expect(ana.locator('.watchers')).toHaveCount(0);
+
+  await ana.getByRole('button', { name: 'Open the market' }).click();
+  await waitForMyTurn(ana);
+  const citra = await newPlayer(browser);
+  await citra.goto(`/r/${code}`);
+  await citra.getByLabel('Your merchant name').fill('Citra');
+  await citra.getByRole('button', { name: 'Just watch' }).click();
+  await expect(citra.locator('.topbar__turn')).toHaveText("Ana's turn");
+  await expect(citra.locator('.dock')).toHaveCount(0);
+  await citra.getByRole('button', { name: /^Chat/ }).click();
+  await expect(citra.locator('.watchers')).toContainText('you');
+  await citra.getByLabel('Chat message').fill('Nice opening');
+  await citra.getByRole('button', { name: 'Send' }).click();
+  await expect(ana.locator('.chat-bubble', { hasText: 'Nice opening' })).toBeVisible();
+  await ana.getByRole('button', { name: /^Chat/ }).click();
+  await shot(ana, '13-host-viewers');
+  await ana.getByRole('button', { name: 'Remove Citra' }).click();
+  await expect(citra.getByText('The host removed you from this table.')).toBeVisible();
+  await expect(ana.locator('.watchers')).toHaveCount(0);
+  await shot(citra, '13-viewer-table');
 });

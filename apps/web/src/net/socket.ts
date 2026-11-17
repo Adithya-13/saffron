@@ -7,6 +7,7 @@ const MAX_BACKOFF_MS = 8000;
 
 type Session = {
   readonly code: string;
+  readonly watch: boolean;
   socket: WebSocket | null;
   closedByUser: boolean;
   attempts: number;
@@ -37,7 +38,12 @@ const open = (current: Session): void => {
     current.everOpened = true;
     useStore.getState().setConnection('open');
     const token = loadToken(current.code);
-    send({ type: 'join', name: loadName() || 'Trader', ...(token ? { token } : {}) });
+    send({
+      type: 'join',
+      name: loadName() || 'Trader',
+      ...(token ? { token } : {}),
+      ...(current.watch ? { watch: true } : {}),
+    });
   });
 
   socket.addEventListener('message', (event) => {
@@ -64,9 +70,9 @@ const open = (current: Session): void => {
   });
 };
 
-export const connect = (code: string): void => {
+export const connect = (code: string, watch: boolean): void => {
   disconnect();
-  session = { code, socket: null, closedByUser: false, attempts: 0, everOpened: false };
+  session = { code, watch, socket: null, closedByUser: false, attempts: 0, everOpened: false };
   useStore.getState().setCode(code);
   open(session);
 };

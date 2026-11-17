@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { MAX_CHAT_LENGTH } from '@saffron/protocol';
 import { play } from '../audio/sound.ts';
 import { send } from '../net/socket.ts';
-import { useStore } from '../state/store.ts';
+import { memberIdOf, useStore } from '../state/store.ts';
 import { useScrollToLatest } from './useScrollToLatest.ts';
 
 export const ChatPanel = ({ active = true }: { active?: boolean }) => {
   const chat = useStore((s) => s.chat);
-  const seatId = useStore((s) => s.seatId);
+  const memberId = useStore(memberIdOf);
   const markChatRead = useStore((s) => s.markChatRead);
   const [text, setText] = useState('');
   const lastId = chat.at(-1)?.id;
@@ -22,8 +22,8 @@ export const ChatPanel = ({ active = true }: { active?: boolean }) => {
   useEffect(() => {
     if (lastId === heardId.current) return;
     heardId.current = lastId;
-    if (lastSeat && lastSeat !== seatId) play('pop', { volume: 0.35 });
-  }, [lastId, lastSeat, seatId]);
+    if (lastSeat && lastSeat !== memberId) play('pop', { volume: 0.35 });
+  }, [lastId, lastSeat, memberId]);
 
   return (
     <div className="chat">
@@ -32,14 +32,19 @@ export const ChatPanel = ({ active = true }: { active?: boolean }) => {
         {chat.map((m) => (
           <li
             key={m.id}
-            className={`chat__msg${m.seatId === null ? ' chat__msg--system' : ''}${m.seatId === seatId ? ' chat__msg--mine' : ''}`}
+            className={`chat__msg${m.seatId === null ? ' chat__msg--system' : ''}${m.seatId !== null && m.seatId === memberId ? ' chat__msg--mine' : ''}`}
           >
-            {m.seatId !== null && <span className="chat__name">{m.name}</span>}
+            {m.seatId !== null && (
+              <span className="chat__name">
+                {m.name}
+                {m.watching && <span className="chat__watching"> watching</span>}
+              </span>
+            )}
             <span className="chat__text">{m.text}</span>
           </li>
         ))}
       </ol>
-      {seatId && (
+      {memberId && (
         <form
           className="chat__form"
           onSubmit={(e) => {

@@ -12,6 +12,7 @@ import { ConfirmAction } from '../components/ConfirmAction.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Avatar } from '../components/Avatar.tsx';
+import { Watchers } from '../components/Watchers.tsx';
 import { CloseIcon } from '../art/Icons.tsx';
 import { shareUrl } from '../components/MenuSheet.tsx';
 import { THEME_INFO } from '../theme/useRoomTheme.ts';
@@ -68,6 +69,7 @@ const ThemePicker = ({ theme, seats, myVote, canVote }: PickerProps) => (
 export const Lobby = () => {
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
+  const watching = useStore((s) => s.viewerId !== null);
   const showToast = useStore((s) => s.showToast);
   const [rulesOpen, setRulesOpen] = useState(false);
   const [soundOpen, setSoundOpen] = useState(false);
@@ -153,6 +155,7 @@ export const Lobby = () => {
             </li>
           )}
         </ul>
+        <Watchers />
 
         <div className="lobby__actions">
           {isHost ? (
@@ -174,6 +177,22 @@ export const Lobby = () => {
                 Open the market
               </button>
             </>
+          ) : watching ? (
+            <>
+              <p className="muted lobby__watching">
+                {openSeats > 0
+                  ? 'You are watching. Take a seat to play.'
+                  : 'You are watching. The table is full.'}
+              </p>
+              <button
+                className="btn btn--primary"
+                type="button"
+                disabled={openSeats === 0}
+                onClick={() => send({ type: 'takeSeat' })}
+              >
+                Take a seat
+              </button>
+            </>
           ) : (
             <p className="muted">Waiting for the host to open the market...</p>
           )}
@@ -188,7 +207,7 @@ export const Lobby = () => {
           <button className="link-btn" type="button" onClick={() => setSoundOpen(true)}>
             Sound
           </button>
-          {seatId !== null && (
+          {(seatId !== null || watching) && (
             <button className="link-btn" type="button" onClick={leave}>
               Leave room
             </button>

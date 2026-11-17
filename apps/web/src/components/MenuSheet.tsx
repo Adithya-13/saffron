@@ -17,11 +17,12 @@ export const MenuSheet = ({ onClose, onRules, onSound }: Props) => {
   const showToast = useStore((s) => s.showToast);
   const status = useStore((s) => s.room?.status);
   const seated = useStore((s) => s.seatId !== null);
+  const watching = useStore((s) => s.viewerId !== null);
   const isHost = useStore((s) => s.seatId !== null && s.seatId === s.room?.hostSeatId);
   const handsSeat = seated && status !== 'finished';
 
   const leave = () => {
-    if (handsSeat) send({ type: 'leave' });
+    if (handsSeat || watching) send({ type: 'leave' });
     navigate('/');
   };
 

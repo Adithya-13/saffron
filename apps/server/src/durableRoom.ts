@@ -13,12 +13,12 @@ import {
 import type { Ctx, Outcome, RoomState, StoredRoom } from './room.ts';
 import { randomId, randomSeed } from './random.ts';
 
-type Attachment = { readonly seatId: string | null };
+type Attachment = { readonly memberId: string | null };
 
 const ROOM_KEY = 'room';
 
 const attachmentOf = (ws: WebSocket): Attachment =>
-  (ws.deserializeAttachment() as Attachment | null) ?? { seatId: null };
+  (ws.deserializeAttachment() as Attachment | null) ?? { memberId: null };
 
 const send = (ws: WebSocket, message: ServerMessage): void => {
   try {
@@ -55,7 +55,7 @@ export class Room extends DurableObject {
     }
     const pair = new WebSocketPair();
     this.ctx.acceptWebSocket(pair[1]);
-    pair[1].serializeAttachment({ seatId: null } satisfies Attachment);
+    pair[1].serializeAttachment({ memberId: null } satisfies Attachment);
     return new Response(null, { status: 101, webSocket: pair[0] });
   }
 
@@ -67,7 +67,7 @@ export class Room extends DurableObject {
       send(ws, { type: 'error', code: 'badMessage' });
       return;
     }
-    await this.apply(handleMessage(room, attachmentOf(ws).seatId, message, this.context()), ws);
+    await this.apply(handleMessage(room, attachmentOf(ws).memberId, message, this.context()), ws);
   }
 
   override async webSocketClose(ws: WebSocket): Promise<void> {
@@ -87,14 +87,14 @@ export class Room extends DurableObject {
   }
 
   private async disconnect(ws: WebSocket): Promise<void> {
-    const { seatId } = attachmentOf(ws);
+    const { memberId } = attachmentOf(ws);
     const room = await this.load();
-    if (!room || seatId === null) return;
+    if (!room || memberId === null) return;
     const stillConnected = this.ctx
       .getWebSockets()
-      .some((other) => other !== ws && attachmentOf(other).seatId === seatId);
+      .some((other) => other !== ws && attachmentOf(other).memberId === memberId);
     if (stillConnected) return;
-    await this.apply(disconnect(room, seatId, Date.now()), null);
+    await this.apply(disconnect(room, memberId, Date.now()), null);
   }
 
   private async close(): Promise<void> {
@@ -115,22 +115,22 @@ export class Room extends DurableObject {
     await this.ctx.storage.put(ROOM_KEY, room);
 
     if (sender && outcome.bind !== undefined) {
-      sender.serializeAttachment({ seatId: outcome.bind } satisfies Attachment);
+      sender.serializeAttachment({ memberId: outcome.bind } satisfies Attachment);
     }
     for (const reply of outcome.replies) if (sender) send(sender, reply);
 
     const sockets = this.ctx.getWebSockets();
     if (outcome.kick !== undefined) {
       for (const ws of sockets) {
-        if (attachmentOf(ws).seatId !== outcome.kick) continue;
+        if (attachmentOf(ws).memberId !== outcome.kick) continue;
         send(ws, { type: 'kicked' });
-        ws.serializeAttachment({ seatId: null } satisfies Attachment);
+        ws.serializeAttachment({ memberId: null } satisfies Attachment);
       }
     }
     if (outcome.sync) {
       const now = Date.now();
       for (const ws of sockets) {
-        send(ws, syncFor(room, attachmentOf(ws).seatId, outcome.events, now));
+        send(ws, syncFor(room, attachmentOf(ws).memberId, outcome.events, now));
       }
     }
     const justJoined = sender && outcome.bind !== undefined ? sender : null;

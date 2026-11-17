@@ -47,6 +47,7 @@ type State = {
   readonly code: string | null;
   readonly connection: Connection;
   readonly seatId: string | null;
+  readonly viewerId: string | null;
   readonly room: RoomSnapshot | null;
   readonly view: PlayerView | null;
   readonly legal: readonly Move[];
@@ -86,14 +87,19 @@ const ERROR_TEXT: Partial<Record<ErrorCode, string>> = {
   undoPending: 'Waiting on the take-back vote',
   undoUnavailable: 'Take-back is no longer available',
   notHost: 'Only the host can do that',
+  notInLobby: 'The game has already started',
 };
 
 let toastCounter = 0;
+
+export const memberIdOf = (s: Pick<State, 'seatId' | 'viewerId'>): string | null =>
+  s.seatId ?? s.viewerId;
 
 export const useStore = create<State & Actions>()((set, get) => ({
   code: null,
   connection: 'idle',
   seatId: null,
+  viewerId: null,
   room: null,
   view: null,
   legal: [],
@@ -116,6 +122,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
       chat: [],
       log: [],
       seatId: null,
+      viewerId: null,
       removed: null,
     }),
   setConnection: (connection) => set({ connection }),
@@ -123,7 +130,7 @@ export const useStore = create<State & Actions>()((set, get) => ({
   receive: (message) => {
     switch (message.type) {
       case 'welcome':
-        set({ seatId: message.seatId });
+        set({ seatId: message.seatId, viewerId: message.viewerId });
         return;
       case 'sync':
         set((s) => ({
@@ -137,7 +144,8 @@ export const useStore = create<State & Actions>()((set, get) => ({
           unreadChat: message.replace
             ? 0
             : s.unreadChat +
-              message.messages.filter((m) => m.seatId !== null && m.seatId !== s.seatId).length,
+              message.messages.filter((m) => m.seatId !== null && m.seatId !== memberIdOf(s))
+                .length,
         }));
         return;
       case 'error':

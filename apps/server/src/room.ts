@@ -11,7 +11,7 @@ import {
   viewFor,
 } from '@saffron/engine';
 import type { GameEvent, GameState, Move, RngState } from '@saffron/engine';
-import { DEFAULT_THEME, THEMES, TURN_MS } from '@saffron/protocol';
+import { DEFAULT_THEME, MAX_VIEWERS, THEMES, TURN_MS } from '@saffron/protocol';
 import type {
   ChatMessage,
   ClientMessage,
@@ -22,6 +22,7 @@ import type {
   ServerMessage,
   Theme,
   UndoVoteInfo,
+  ViewerInfo,
 } from '@saffron/protocol';
 
 export const BOT_DELAY_MS = 1100;
@@ -45,6 +46,12 @@ const BOT_NAMES = [
 
 export type Seat = SeatInfo & { readonly token: string | null; readonly lastChatAt: number };
 
+export type Viewer = ViewerInfo & {
+  readonly token: string;
+  readonly connected: boolean;
+  readonly lastChatAt: number;
+};
+
 export type UndoPoint = { readonly snapshot: GameState; readonly actorId: string };
 
 export type TurnClock = {
@@ -60,6 +67,7 @@ export type RoomState = {
   readonly hostSeatId: string | null;
   readonly theme: Theme;
   readonly seats: readonly Seat[];
+  readonly viewers: readonly Viewer[];
   readonly game: GameState | null;
   readonly turnStart: GameState | null;
   readonly undoPoint: UndoPoint | null;
@@ -110,6 +118,7 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   hostSeatId: null,
   theme: DEFAULT_THEME,
   seats: [],
+  viewers: [],
   game: null,
   turnStart: null,
   undoPoint: null,
@@ -126,9 +135,10 @@ const LEGACY_TARGET_POINTS = 15;
 type StoredGame = Omit<GameState, 'targetPoints'> & { readonly targetPoints?: number };
 export type StoredRoom = Omit<
   RoomState,
-  'theme' | 'seats' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
+  'theme' | 'seats' | 'viewers' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
 > & {
   readonly theme?: Theme;
+  readonly viewers?: readonly Viewer[];
   readonly seats: readonly (Omit<Seat, 'themeVote'> & { readonly themeVote?: Theme | null })[];
   readonly clock?: TurnClock | null;
   readonly autopilot?: readonly string[];
@@ -146,6 +156,7 @@ export const upgradeRoom = (stored: StoredRoom): RoomState => ({
   ...stored,
   theme: stored.theme ?? DEFAULT_THEME,
   seats: stored.seats.map((s) => ({ ...s, themeVote: s.themeVote ?? null })),
+  viewers: stored.viewers ?? [],
   clock: stored.clock ?? null,
   autopilot: stored.autopilot ?? [],
   game: stored.game && upgradeGame(stored.game),
@@ -172,6 +183,9 @@ const withChat = (room: RoomState, messages: readonly ChatMessage[]): RoomState 
 const seatOf = (room: RoomState, seatId: string | null): Seat | undefined =>
   seatId === null ? undefined : room.seats.find((s) => s.id === seatId);
 
+const viewerOf = (room: RoomState, viewerId: string | null): Viewer | undefined =>
+  viewerId === null ? undefined : room.viewers.find((v) => v.id === viewerId);
+
 const nameOf = (room: RoomState, seatId: string): string => seatOf(room, seatId)?.name ?? 'Someone';
 
 const currentSeatId = (room: RoomState): string | null =>
@@ -179,10 +193,38 @@ const currentSeatId = (room: RoomState): string | null =>
     ? (room.game.players[room.game.currentPlayer]?.id ?? null)
     : null;
 
-export const setConnected = (room: RoomState, seatId: string, connected: boolean): RoomState => ({
+export const setConnected = (room: RoomState, memberId: string, connected: boolean): RoomState => ({
   ...room,
-  seats: room.seats.map((s) => (s.id === seatId ? { ...s, connected } : s)),
+  seats: room.seats.map((s) => (s.id === memberId ? { ...s, connected } : s)),
+  viewers: room.viewers.map((v) => (v.id === memberId ? { ...v, connected } : v)),
 });
+
+const welcome = (
+  seatId: string | null,
+  viewerId: string | null,
+  token: string | null,
+): ServerMessage => ({ type: 'welcome', seatId, viewerId, token });
+
+const watch = (room: RoomState, name: string, ctx: Ctx): Outcome => {
+  const kept =
+    room.viewers.length < MAX_VIEWERS ? room.viewers : room.viewers.filter((v) => v.connected);
+  if (kept.length >= MAX_VIEWERS) {
+    return synced(room, { replies: [welcome(null, null, null)], bind: null });
+  }
+  const viewer: Viewer = {
+    id: ctx.randomId(),
+    name,
+    connected: true,
+    token: ctx.randomId() + ctx.randomId(),
+    lastChatAt: 0,
+  };
+  const note = systemChat(ctx, `${name} is watching`);
+  return synced(withChat({ ...room, viewers: [...kept, viewer] }, [note]), {
+    replies: [welcome(null, viewer.id, viewer.token)],
+    chat: [note],
+    bind: viewer.id,
+  });
+};
 
 const join = (
   room: RoomState,
@@ -192,12 +234,19 @@ const join = (
   const existing = msg.token ? room.seats.find((s) => s.token === msg.token) : undefined;
   if (existing) {
     return synced(setConnected(room, existing.id, true), {
-      replies: [{ type: 'welcome', seatId: existing.id, token: existing.token }],
+      replies: [welcome(existing.id, null, existing.token)],
       bind: existing.id,
     });
   }
-  if (room.status !== 'lobby' || room.seats.length >= MAX_PLAYERS) {
-    return synced(room, { replies: [{ type: 'welcome', seatId: null, token: null }], bind: null });
+  const returning = msg.token ? room.viewers.find((v) => v.token === msg.token) : undefined;
+  if (returning) {
+    return synced(setConnected(room, returning.id, true), {
+      replies: [welcome(null, returning.id, returning.token)],
+      bind: returning.id,
+    });
+  }
+  if (msg.watch === true || room.status !== 'lobby' || room.seats.length >= MAX_PLAYERS) {
+    return watch(room, msg.name, ctx);
   }
   const seat: Seat = {
     id: ctx.randomId(),
@@ -215,9 +264,36 @@ const join = (
   };
   const note = systemChat(ctx, `${seat.name} joined the bazaar`);
   return synced(withChat(joined, [note]), {
-    replies: [{ type: 'welcome', seatId: seat.id, token: seat.token }],
+    replies: [welcome(seat.id, null, seat.token)],
     chat: [note],
     bind: seat.id,
+  });
+};
+
+const takeSeat = (room: RoomState, senderId: string, ctx: Ctx): Outcome => {
+  const viewer = viewerOf(room, senderId);
+  if (!viewer) return failure(room, 'notWatching');
+  if (room.status !== 'lobby') return failure(room, 'notInLobby');
+  if (room.seats.length >= MAX_PLAYERS) return failure(room, 'roomFull');
+  const seat: Seat = {
+    id: viewer.id,
+    name: viewer.name,
+    kind: 'human',
+    connected: true,
+    token: viewer.token,
+    lastChatAt: viewer.lastChatAt,
+    themeVote: null,
+  };
+  const seated: RoomState = {
+    ...room,
+    viewers: room.viewers.filter((v) => v.id !== viewer.id),
+    seats: [...room.seats, seat],
+    hostSeatId: room.hostSeatId ?? seat.id,
+  };
+  const note = systemChat(ctx, `${seat.name} took a seat`);
+  return synced(withChat(seated, [note]), {
+    replies: [welcome(seat.id, null, seat.token)],
+    chat: [note],
   });
 };
 
@@ -304,6 +380,12 @@ const removeSeat = (
   ctx: Ctx,
 ): Outcome => {
   if (senderId === null || senderId !== room.hostSeatId) return failure(room, 'notHost');
+  if (viewerOf(room, seatId)) {
+    return synced(
+      { ...room, viewers: room.viewers.filter((v) => v.id !== seatId) },
+      { kick: seatId },
+    );
+  }
   const seat = seatOf(room, seatId);
   if (seatId === room.hostSeatId || !seat) return failure(room, 'notSeated');
   if (room.status === 'lobby') return synced(withoutSeat(room, seatId), { kick: seatId });
@@ -319,6 +401,12 @@ const closeRoom = (room: RoomState, senderId: string): Outcome =>
   senderId === room.hostSeatId ? { ...unchanged(room), close: true } : failure(room, 'notHost');
 
 const leave = (room: RoomState, senderId: string, ctx: Ctx): Outcome => {
+  if (viewerOf(room, senderId)) {
+    return synced(
+      { ...room, viewers: room.viewers.filter((v) => v.id !== senderId) },
+      { bind: null },
+    );
+  }
   const seat = seatOf(room, senderId);
   if (!seat || seat.kind === 'bot') return failure(room, 'notSeated');
   if (room.status === 'lobby') {
@@ -480,20 +568,24 @@ const voteUndo = (
   return synced({ ...room, undoVote: { ...vote, approvals } });
 };
 
-const chat = (room: RoomState, senderId: string | null, text: string, ctx: Ctx): Outcome => {
+const chat = (room: RoomState, senderId: string, text: string, ctx: Ctx): Outcome => {
   const seat = seatOf(room, senderId);
-  if (!seat) return failure(room, 'notSeated');
-  if (ctx.now - seat.lastChatAt < CHAT_COOLDOWN_MS) return failure(room, 'rateLimited');
+  const viewer = seat ? undefined : viewerOf(room, senderId);
+  const member = seat ?? viewer;
+  if (!member) return failure(room, 'notSeated');
+  if (ctx.now - member.lastChatAt < CHAT_COOLDOWN_MS) return failure(room, 'rateLimited');
   const message: ChatMessage = {
     id: ctx.randomId(),
-    seatId: seat.id,
-    name: seat.name,
+    seatId: member.id,
+    name: member.name,
     text,
     at: ctx.now,
+    ...(viewer ? { watching: true } : {}),
   };
-  const updated = {
+  const updated: RoomState = {
     ...room,
-    seats: room.seats.map((s) => (s.id === seat.id ? { ...s, lastChatAt: ctx.now } : s)),
+    seats: room.seats.map((s) => (s.id === member.id ? { ...s, lastChatAt: ctx.now } : s)),
+    viewers: room.viewers.map((v) => (v.id === member.id ? { ...v, lastChatAt: ctx.now } : v)),
   };
   return { ...unchanged(withChat(updated, [message])), chat: [message] };
 };
@@ -571,6 +663,8 @@ const route = (room: RoomState, senderId: string | null, msg: ClientMessage, ctx
       return stillHere(room, senderId);
     case 'resume':
       return resume(room, senderId);
+    case 'takeSeat':
+      return takeSeat(room, senderId, ctx);
     case 'leave':
       return leave(room, senderId, ctx);
     case 'closeRoom':
@@ -618,8 +712,8 @@ export const tick = (room: RoomState, ctx: Ctx): Outcome | null => {
   return outcome && clocked(outcome, ctx.now);
 };
 
-export const disconnect = (room: RoomState, seatId: string, now: number): Outcome =>
-  synced(withClock(setConnected(room, seatId, false), now));
+export const disconnect = (room: RoomState, memberId: string, now: number): Outcome =>
+  synced(withClock(setConnected(room, memberId, false), now));
 
 export const nextWakeAt = (room: RoomState, now: number): number | null => {
   const wakes = [
@@ -642,6 +736,7 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
     connected,
     themeVote,
   })),
+  viewers: room.viewers.filter((v) => v.connected).map(({ id, name }) => ({ id, name })),
   undoAvailableTo: room.undoVote ? null : (room.undoPoint?.actorId ?? null),
   undoVote: room.undoVote,
   turnDeadline: room.clock?.deadline ?? null,

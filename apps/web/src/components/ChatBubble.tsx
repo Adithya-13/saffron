@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChatMessage } from '@saffron/protocol';
 import { play } from '../audio/sound.ts';
 import { seatIndex } from '../state/selectors.ts';
-import { useStore } from '../state/store.ts';
+import { memberIdOf, useStore } from '../state/store.ts';
 import { Avatar } from './Avatar.tsx';
 
 const BUBBLE_MS = 3500;
@@ -12,7 +12,7 @@ type Props = { readonly suppressed: boolean; readonly onOpen: () => void };
 
 export const ChatBubble = ({ suppressed, onOpen }: Props) => {
   const room = useStore((s) => s.room);
-  const seatId = useStore((s) => s.seatId);
+  const memberId = useStore(memberIdOf);
   const last = useStore((s) => s.chat.at(-1));
   const seenId = useRef(last?.id);
   const [shown, setShown] = useState<ChatMessage | null>(null);
@@ -20,10 +20,10 @@ export const ChatBubble = ({ suppressed, onOpen }: Props) => {
   useEffect(() => {
     if (!last || last.id === seenId.current) return;
     seenId.current = last.id;
-    if (suppressed || last.seatId === null || last.seatId === seatId) return;
+    if (suppressed || last.seatId === null || last.seatId === memberId) return;
     setShown(last);
     play('pop', { volume: 0.35 });
-  }, [last, suppressed, seatId]);
+  }, [last, suppressed, memberId]);
 
   useEffect(() => {
     if (!shown) return;
@@ -55,7 +55,10 @@ export const ChatBubble = ({ suppressed, onOpen }: Props) => {
           >
             <Avatar index={seatIndex(room, shown.seatId ?? '')} name={shown.name} size={26} />
             <span className="chat-bubble__body">
-              <span className="chat-bubble__name">{shown.name}</span>
+              <span className="chat-bubble__name">
+                {shown.name}
+                {shown.watching && <span className="chat__watching"> watching</span>}
+              </span>
               <span className="chat-bubble__text">{shown.text}</span>
             </span>
           </motion.button>

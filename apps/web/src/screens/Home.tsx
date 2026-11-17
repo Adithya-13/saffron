@@ -1,68 +1,13 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { CATALOG, GAME_NAME } from '@saffron/content';
-import type { Card as CardData, Spice, Tier } from '@saffron/engine';
+import { GAME_NAME } from '@saffron/content';
 import { MAX_NAME_LENGTH, ROOM_CODE_LENGTH } from '@saffron/protocol';
 import { navigate } from '../App.tsx';
-import { SpiceIcon } from '../art/SpiceIcon.tsx';
-import { Card } from '../components/Card.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
 import { createRoom } from '../net/socket.ts';
 import { loadName, saveName } from '../net/storage.ts';
-
-const STEP_SPICES: readonly Spice[] = ['saffron', 'cardamom', 'sumac'];
-
-const sampleCard = (tier: Tier, bonus: Spice): CardData | undefined =>
-  CATALOG.cards
-    .filter((c) => c.tier === tier && c.bonus === bonus)
-    .sort((a, b) => b.points - a.points)[0];
-
-const BUY_CARD = sampleCard(1, 'saffron');
-const SCORE_CARD = sampleCard(3, 'pepper');
-
-type HowToPlayProps = { readonly onRules: () => void; readonly onSound: () => void };
-
-const HowToPlay = ({ onRules, onSound }: HowToPlayProps) => (
-  <section className="home__how" aria-labelledby="home-how-title">
-    <h2 id="home-how-title" className="home__section-title">
-      How a turn works
-    </h2>
-    <ol className="home__steps">
-      <li className="home__step">
-        <span className="home__step-art home__step-art--spices" aria-hidden>
-          {STEP_SPICES.map((s) => (
-            <SpiceIcon key={s} token={s} size={30} className="spice-disc" />
-          ))}
-        </span>
-        <h3 className="home__step-title">Take spices</h3>
-        <p className="home__step-text">Three different kinds, or two of one kind.</p>
-      </li>
-      <li className="home__step">
-        <span className="home__step-art" aria-hidden>
-          {BUY_CARD && <Card card={BUY_CARD} />}
-        </span>
-        <h3 className="home__step-title">Buy a card</h3>
-        <p className="home__step-text">Its spice becomes a discount on every card after it.</p>
-      </li>
-      <li className="home__step">
-        <span className="home__step-art" aria-hidden>
-          {SCORE_CARD && <Card card={SCORE_CARD} />}
-        </span>
-        <h3 className="home__step-title">Earn prestige</h3>
-        <p className="home__step-text">Reach the target first, and the guilds come calling.</p>
-      </li>
-    </ol>
-    <span className="home__links">
-      <button className="link-btn" type="button" onClick={onRules}>
-        Read the full rules
-      </button>
-      <button className="link-btn" type="button" onClick={onSound}>
-        Sound
-      </button>
-    </span>
-  </section>
-);
+import { GoalSection, GuildSection, Plate, TierSection, TurnSection } from './HomeSections.tsx';
 
 export const Home = () => {
   const [name, setName] = useState(loadName);
@@ -88,52 +33,57 @@ export const Home = () => {
     }
   };
 
-  const join = (event: FormEvent) => {
-    event.preventDefault();
+  const enter = (watch: boolean) => {
     const code = joinCode.trim().toUpperCase();
     if (!trimmed || code.length !== ROOM_CODE_LENGTH) return;
     saveName(trimmed);
-    navigate(`/r/${code}`);
+    navigate(watch ? `/r/${code}?watch` : `/r/${code}`);
+  };
+
+  const join = (event: FormEvent) => {
+    event.preventDefault();
+    enter(false);
   };
 
   return (
-    <main className="home">
-      <div className="home__art">
-        <img src="/assets/misc/hero.webp" alt="" />
-      </div>
+    <main className="landing">
+      <div className="hero">
+        <Plate numeral="I" caption="The saffron market at midday." className="hero__plate">
+          <img className="hero__art" src="/assets/misc/hero.webp" alt="" fetchPriority="high" />
+        </Plate>
 
-      <div className="home__content">
-        <header className="home__intro">
-          <p className="home__eyebrow">A spice-market card game</p>
-          <h1 className="home__title">{GAME_NAME}</h1>
-          <p className="home__tagline">
-            Trade spices, buy stalls, caravans and ships, and win over the guilds before your
-            friends do.
-          </p>
-          <ul className="home__facts">
-            <li>2 to 8 players</li>
-            <li>About 30 minutes</li>
-            <li>Made for phones</li>
-          </ul>
-        </header>
+        <div className="hero__body">
+          <header className="hero__intro">
+            <p className="hero__eyebrow">A card game of the spice market</p>
+            <h1 className="hero__title">{GAME_NAME}</h1>
+            <p className="hero__tagline">
+              Trade spices, buy stalls, caravans and fleets, and win over the guilds before your
+              friends do.
+            </p>
+            <p className="hero__facts">
+              <span>2 to 8 players</span>
+              <span>About 30 minutes</span>
+              <span>Plays on your phone</span>
+            </p>
+          </header>
 
-        <section className="home__play" aria-label="Play">
-          <label className="field">
-            <span className="field__label">Your merchant name</span>
-            <input
-              className="field__input"
-              value={name}
-              maxLength={MAX_NAME_LENGTH}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Adit"
-              autoComplete="nickname"
-            />
-          </label>
+          <section id="play" className="entry" aria-labelledby="entry-title">
+            <h2 id="entry-title" className="entry__title">
+              Take a seat
+            </h2>
+            <label className="entry__field">
+              <span className="entry__label">Your merchant name</span>
+              <input
+                className="entry__name"
+                value={name}
+                maxLength={MAX_NAME_LENGTH}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Your name"
+                autoComplete="nickname"
+              />
+            </label>
 
-          <div className="home__options">
-            <form className="home__option" onSubmit={host}>
-              <h2 className="home__option-title">Start a table</h2>
-              <p className="home__option-text">You get a code to send to friends.</p>
+            <form className="entry__host" onSubmit={host}>
               <button
                 className="btn btn--primary btn--wide"
                 disabled={!trimmed || busy}
@@ -141,41 +91,64 @@ export const Home = () => {
               >
                 {busy ? 'Opening a stall...' : 'Host a game'}
               </button>
+              <p className="entry__note">You get a 5-letter code to send to friends.</p>
             </form>
 
-            <form className="home__option" onSubmit={join}>
-              <h2 className="home__option-title">Join a table</h2>
-              <p className="home__option-text">Type the 5-letter code from the host.</p>
-              <span className="home__join">
-                <input
-                  className="field__input field__input--code"
-                  value={joinCode}
-                  maxLength={ROOM_CODE_LENGTH}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="CODE"
-                  aria-label="Room code"
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                />
-                <button
-                  className={`btn ${codeReady ? 'btn--primary' : 'btn--ghost'}`}
-                  disabled={!trimmed || !codeReady}
-                  type="submit"
-                >
-                  Join
-                </button>
-              </span>
+            <p className="entry__or">
+              <span>or join a friend&apos;s table</span>
+            </p>
+
+            <form className="entry__join" onSubmit={join}>
+              <input
+                className="field__input field__input--code"
+                value={joinCode}
+                maxLength={ROOM_CODE_LENGTH}
+                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="CODE"
+                aria-label="Room code"
+                autoCapitalize="characters"
+                autoComplete="off"
+              />
+              <button
+                className={`btn ${codeReady ? 'btn--primary' : 'btn--ghost'}`}
+                disabled={!trimmed || !codeReady}
+                type="submit"
+              >
+                Join
+              </button>
+              <button
+                className="btn btn--ghost"
+                type="button"
+                disabled={!trimmed || !codeReady}
+                onClick={() => enter(true)}
+              >
+                Watch
+              </button>
             </form>
-          </div>
 
-          {!trimmed && (
-            <p className="home__hint">Add your name first, so friends know who you are.</p>
-          )}
-          {error && <p className="home__error">{error}</p>}
-        </section>
-
-        <HowToPlay onRules={() => setRulesOpen(true)} onSound={() => setSoundOpen(true)} />
+            {!trimmed && (
+              <p className="entry__hint">Add your name first, so friends know who you are.</p>
+            )}
+            {error && (
+              <p className="entry__error" role="alert">
+                {error}
+              </p>
+            )}
+          </section>
+        </div>
       </div>
+
+      <TurnSection />
+      <TierSection />
+      <GuildSection />
+      <GoalSection onRules={() => setRulesOpen(true)} />
+
+      <footer className="colophon">
+        <span className="colophon__name">{GAME_NAME}</span>
+        <button className="link-btn" type="button" onClick={() => setSoundOpen(true)}>
+          Sound
+        </button>
+      </footer>
 
       {rulesOpen && <RulesSheet onClose={() => setRulesOpen(false)} />}
       {soundOpen && <SoundSettings onClose={() => setSoundOpen(false)} />}

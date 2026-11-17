@@ -11,17 +11,20 @@ import { Lobby } from './Lobby.tsx';
 import { Table } from './Table.tsx';
 import { MAX_NAME_LENGTH } from '@saffron/protocol';
 
-const NamePrompt = ({ onDone }: { onDone: () => void }) => {
+const NamePrompt = ({ onDone }: { onDone: (watch: boolean) => void }) => {
   const [name, setName] = useState('');
+  const finish = (watch: boolean) => {
+    if (!name.trim()) return;
+    saveName(name.trim());
+    onDone(watch);
+  };
   return (
     <main className="center-screen">
       <form
         className="panel name-prompt"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!name.trim()) return;
-          saveName(name.trim());
-          onDone();
+          finish(false);
         }}
       >
         <h1 className="name-prompt__title">Join the bazaar</h1>
@@ -35,9 +38,19 @@ const NamePrompt = ({ onDone }: { onDone: () => void }) => {
             autoFocus
           />
         </label>
-        <button className="btn btn--primary btn--wide" type="submit" disabled={!name.trim()}>
-          Enter
-        </button>
+        <div className="name-prompt__actions">
+          <button className="btn btn--primary" type="submit" disabled={!name.trim()}>
+            Take a seat
+          </button>
+          <button
+            className="btn btn--ghost"
+            type="button"
+            disabled={!name.trim()}
+            onClick={() => finish(true)}
+          >
+            Just watch
+          </button>
+        </div>
       </form>
     </main>
   );
@@ -81,8 +94,11 @@ const Removed = ({ reason }: { readonly reason: keyof typeof REMOVED_TEXT }) => 
   </main>
 );
 
+const watchRequested = (): boolean => new URLSearchParams(location.search).has('watch');
+
 export const RoomScreen = ({ code }: { code: string }) => {
   const [hasName, setHasName] = useState(() => loadName().trim().length > 0);
+  const [watch, setWatch] = useState(watchRequested);
   const connection = useStore((s) => s.connection);
   const room = useStore((s) => s.room);
   const removed = useStore((s) => s.removed);
@@ -91,11 +107,20 @@ export const RoomScreen = ({ code }: { code: string }) => {
 
   useEffect(() => {
     if (!hasName) return;
-    connect(code);
+    connect(code, watch);
     return () => disconnect();
-  }, [code, hasName]);
+  }, [code, hasName, watch]);
 
-  if (!hasName) return <NamePrompt onDone={() => setHasName(true)} />;
+  if (!hasName) {
+    return (
+      <NamePrompt
+        onDone={(asViewer) => {
+          setWatch(asViewer);
+          setHasName(true);
+        }}
+      />
+    );
+  }
   if (removed) return <Removed reason={removed} />;
   if (!room) {
     return (
