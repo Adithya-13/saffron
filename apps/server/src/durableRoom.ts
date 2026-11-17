@@ -3,12 +3,11 @@ import { parseClientMessage } from '@saffron/protocol/schema';
 import type { ServerMessage } from '@saffron/protocol';
 import {
   createRoom,
-  expireUndo,
+  disconnect,
   handleMessage,
   nextWakeAt,
-  runBotTurn,
-  setConnected,
   syncFor,
+  tick,
   upgradeRoom,
 } from './room.ts';
 import type { Ctx, Outcome, RoomState, StoredRoom } from './room.ts';
@@ -82,7 +81,7 @@ export class Room extends DurableObject {
   override async alarm(): Promise<void> {
     const room = await this.load();
     if (!room) return;
-    const outcome = expireUndo(room, this.context()) ?? runBotTurn(room);
+    const outcome = tick(room, this.context());
     if (outcome) await this.apply(outcome, null);
     else await this.schedule(room);
   }
@@ -95,10 +94,7 @@ export class Room extends DurableObject {
       .getWebSockets()
       .some((other) => other !== ws && attachmentOf(other).seatId === seatId);
     if (stillConnected) return;
-    await this.apply(
-      { room: setConnected(room, seatId, false), replies: [], sync: true, events: [], chat: [] },
-      null,
-    );
+    await this.apply(disconnect(room, seatId, Date.now()), null);
   }
 
   private async apply(outcome: Outcome, sender: WebSocket | null): Promise<void> {
@@ -111,8 +107,18 @@ export class Room extends DurableObject {
     for (const reply of outcome.replies) if (sender) send(sender, reply);
 
     const sockets = this.ctx.getWebSockets();
+    if (outcome.kick !== undefined) {
+      for (const ws of sockets) {
+        if (attachmentOf(ws).seatId !== outcome.kick) continue;
+        send(ws, { type: 'kicked' });
+        ws.serializeAttachment({ seatId: null } satisfies Attachment);
+      }
+    }
     if (outcome.sync) {
-      for (const ws of sockets) send(ws, syncFor(room, attachmentOf(ws).seatId, outcome.events));
+      const now = Date.now();
+      for (const ws of sockets) {
+        send(ws, syncFor(room, attachmentOf(ws).seatId, outcome.events, now));
+      }
     }
     const justJoined = sender && outcome.bind !== undefined ? sender : null;
     if (justJoined) send(justJoined, { type: 'chat', messages: room.chat, replace: true });
@@ -131,6 +137,6 @@ export class Room extends DurableObject {
       return;
     }
     const current = await this.ctx.storage.getAlarm();
-    if (current === null || room.undoVote) await this.ctx.storage.setAlarm(wake);
+    if (current === null || wake < current) await this.ctx.storage.setAlarm(wake);
   }
 }

@@ -27,6 +27,9 @@ import type {
 export const BOT_DELAY_MS = 1100;
 export const UNDO_VOTE_MS = 20_000;
 export const CHAT_COOLDOWN_MS = 600;
+export const TURN_MS = 60_000;
+export const EXTEND_MS = 30_000;
+export const DISCONNECT_GRACE_MS = 15_000;
 const LOG_LIMIT = 300;
 const CHAT_LIMIT = 100;
 const SYSTEM_NAME = 'Bazaar';
@@ -44,6 +47,13 @@ export type Seat = SeatInfo & { readonly token: string | null; readonly lastChat
 
 export type UndoPoint = { readonly snapshot: GameState; readonly actorId: string };
 
+export type TurnClock = {
+  readonly seatId: string;
+  readonly turn: number;
+  readonly deadline: number;
+  readonly extended: boolean;
+};
+
 export type RoomState = {
   readonly code: string;
   readonly status: RoomStatus;
@@ -57,6 +67,8 @@ export type RoomState = {
   readonly log: readonly GameEvent[];
   readonly chat: readonly ChatMessage[];
   readonly botRng: RngState;
+  readonly clock: TurnClock | null;
+  readonly autopilot: readonly string[];
 };
 
 export type Ctx = { readonly now: number; readonly randomId: () => string; readonly seed: number };
@@ -68,6 +80,7 @@ export type Outcome = {
   readonly events: readonly GameEvent[];
   readonly chat: readonly ChatMessage[];
   readonly bind?: string | null;
+  readonly kick?: string;
 };
 
 const unchanged = (room: RoomState, replies: readonly ServerMessage[] = []): Outcome => ({
@@ -103,13 +116,20 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   log: [],
   chat: [],
   botRng: seedRng(seed),
+  clock: null,
+  autopilot: [],
 });
 
 const LEGACY_TARGET_POINTS = 15;
 
 type StoredGame = Omit<GameState, 'targetPoints'> & { readonly targetPoints?: number };
-export type StoredRoom = Omit<RoomState, 'theme' | 'game' | 'turnStart' | 'undoPoint'> & {
+export type StoredRoom = Omit<
+  RoomState,
+  'theme' | 'game' | 'turnStart' | 'undoPoint' | 'clock' | 'autopilot'
+> & {
   readonly theme?: Theme;
+  readonly clock?: TurnClock | null;
+  readonly autopilot?: readonly string[];
   readonly game: StoredGame | null;
   readonly turnStart: StoredGame | null;
   readonly undoPoint: (Omit<UndoPoint, 'snapshot'> & { readonly snapshot: StoredGame }) | null;
@@ -123,6 +143,8 @@ const upgradeGame = (game: StoredGame): GameState => ({
 export const upgradeRoom = (stored: StoredRoom): RoomState => ({
   ...stored,
   theme: stored.theme ?? DEFAULT_THEME,
+  clock: stored.clock ?? null,
+  autopilot: stored.autopilot ?? [],
   game: stored.game && upgradeGame(stored.game),
   turnStart: stored.turnStart && upgradeGame(stored.turnStart),
   undoPoint: stored.undoPoint && {
@@ -218,11 +240,72 @@ const addBot = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => 
   return synced({ ...room, seats: [...room.seats, bot] });
 };
 
-const removeSeat = (room: RoomState, senderId: string | null, seatId: string): Outcome => {
-  const error = requireHostInLobby(room, senderId);
-  if (error) return failure(room, error);
-  if (seatId === room.hostSeatId || !seatOf(room, seatId)) return failure(room, 'notSeated');
-  return synced({ ...room, seats: room.seats.filter((s) => s.id !== seatId) });
+const BOT_SUFFIX = ' (bot)';
+
+const hostAfter = (seats: readonly Seat[], hostSeatId: string | null): string | null =>
+  seats.some((s) => s.id === hostSeatId && s.kind === 'human')
+    ? hostSeatId
+    : (seats.find((s) => s.kind === 'human')?.id ?? null);
+
+const withoutSeat = (room: RoomState, seatId: string): RoomState => {
+  const seats = room.seats.filter((s) => s.id !== seatId);
+  return { ...room, seats, hostSeatId: hostAfter(seats, room.hostSeatId) };
+};
+
+const handToBot = (room: RoomState, seatId: string, note: ChatMessage): Outcome => {
+  const seats = room.seats.map((s) =>
+    s.id === seatId
+      ? {
+          ...s,
+          name: s.name.endsWith(BOT_SUFFIX) ? s.name : `${s.name}${BOT_SUFFIX}`,
+          kind: 'bot' as const,
+          connected: true,
+          token: null,
+        }
+      : s,
+  );
+  const vote = room.undoVote;
+  const voteTouched = vote && (vote.requesterId === seatId || vote.voters.includes(seatId));
+  const handed: RoomState = {
+    ...room,
+    seats,
+    hostSeatId: hostAfter(seats, room.hostSeatId),
+    autopilot: room.autopilot.filter((id) => id !== seatId),
+    undoVote: voteTouched ? null : vote,
+  };
+  return synced(withChat(handed, [note]), { chat: [note], kick: seatId });
+};
+
+const removeSeat = (
+  room: RoomState,
+  senderId: string | null,
+  seatId: string,
+  ctx: Ctx,
+): Outcome => {
+  if (senderId === null || senderId !== room.hostSeatId) return failure(room, 'notHost');
+  const seat = seatOf(room, seatId);
+  if (seatId === room.hostSeatId || !seat) return failure(room, 'notSeated');
+  if (room.status === 'lobby') return synced(withoutSeat(room, seatId), { kick: seatId });
+  if (seat.kind === 'bot') return failure(room, 'notSeated');
+  return handToBot(
+    room,
+    seatId,
+    systemChat(ctx, `The host removed ${seat.name}. A bot takes over their stall`),
+  );
+};
+
+const leave = (room: RoomState, senderId: string, ctx: Ctx): Outcome => {
+  const seat = seatOf(room, senderId);
+  if (!seat || seat.kind === 'bot') return failure(room, 'notSeated');
+  if (room.status === 'lobby') {
+    return synced(withoutSeat(room, senderId), { bind: null, kick: senderId });
+  }
+  const handed = handToBot(
+    room,
+    senderId,
+    systemChat(ctx, `${seat.name} left. A bot takes over their stall`),
+  );
+  return { ...handed, bind: null };
 };
 
 const setTheme = (room: RoomState, senderId: string | null, theme: Theme): Outcome => {
@@ -303,7 +386,13 @@ const applyGameMove = (room: RoomState, actorId: string, move: Move): Outcome =>
 
 const humanVoters = (room: RoomState, requesterId: string): string[] =>
   room.seats
-    .filter((s) => s.kind === 'human' && s.connected && s.id !== requesterId)
+    .filter(
+      (s) =>
+        s.kind === 'human' &&
+        s.connected &&
+        s.id !== requesterId &&
+        !room.autopilot.includes(s.id),
+    )
     .map((s) => s.id);
 
 const performUndo = (room: RoomState, ctx: Ctx): Outcome => {
@@ -386,7 +475,62 @@ const chat = (room: RoomState, senderId: string | null, text: string, ctx: Ctx):
   return { ...unchanged(withChat(updated, [message])), chat: [message] };
 };
 
+const isAutoSeat = (room: RoomState, seat: Seat): boolean =>
+  seat.kind === 'bot' || room.autopilot.includes(seat.id);
+
+const offAutopilot = (room: RoomState, seatId: string): RoomState =>
+  room.autopilot.includes(seatId)
+    ? { ...room, autopilot: room.autopilot.filter((id) => id !== seatId) }
+    : room;
+
+export const withClock = (room: RoomState, now: number): RoomState => {
+  const game = room.game;
+  const seat = seatOf(room, currentSeatId(room));
+  if (!game || room.status !== 'playing' || room.undoVote || !seat || isAutoSeat(room, seat)) {
+    return room.clock === null ? room : { ...room, clock: null };
+  }
+  const current = room.clock;
+  const kept: TurnClock =
+    current && current.seatId === seat.id && current.turn === game.turn
+      ? current
+      : { seatId: seat.id, turn: game.turn, deadline: now + TURN_MS, extended: false };
+  const deadline = seat.connected
+    ? kept.deadline
+    : Math.min(kept.deadline, now + DISCONNECT_GRACE_MS);
+  if (kept === current && deadline === current.deadline) return room;
+  return { ...room, clock: { ...kept, deadline } };
+};
+
+const clocked = (outcome: Outcome, now: number): Outcome => ({
+  ...outcome,
+  room: withClock(outcome.room, now),
+});
+
+const stillHere = (room: RoomState, senderId: string): Outcome => {
+  const clock = room.clock;
+  if (!clock || clock.seatId !== senderId || clock.extended) return unchanged(room);
+  return synced({
+    ...room,
+    clock: { ...clock, deadline: clock.deadline + EXTEND_MS, extended: true },
+  });
+};
+
+const resume = (room: RoomState, senderId: string): Outcome =>
+  room.autopilot.includes(senderId) ? synced(offAutopilot(room, senderId)) : unchanged(room);
+
+const playerMove = (room: RoomState, senderId: string, move: Move): Outcome => {
+  const outcome = applyGameMove(room, senderId, move);
+  return outcome.sync ? { ...outcome, room: offAutopilot(outcome.room, senderId) } : outcome;
+};
+
 export const handleMessage = (
+  room: RoomState,
+  senderId: string | null,
+  msg: ClientMessage,
+  ctx: Ctx,
+): Outcome => clocked(route(room, senderId, msg, ctx), ctx.now);
+
+const route = (
   room: RoomState,
   senderId: string | null,
   msg: ClientMessage,
@@ -400,11 +544,17 @@ export const handleMessage = (
     case 'addBot':
       return addBot(room, senderId, ctx);
     case 'removeSeat':
-      return removeSeat(room, senderId, msg.seatId);
+      return removeSeat(room, senderId, msg.seatId, ctx);
     case 'setTheme':
       return setTheme(room, senderId, msg.theme);
     case 'move':
-      return applyGameMove(room, senderId, msg.move);
+      return playerMove(room, senderId, msg.move);
+    case 'stillHere':
+      return stillHere(room, senderId);
+    case 'resume':
+      return resume(room, senderId);
+    case 'leave':
+      return leave(room, senderId, ctx);
     case 'chat':
       return chat(room, senderId, msg.text, ctx);
     case 'undoRequest':
@@ -416,14 +566,14 @@ export const handleMessage = (
   }
 };
 
-export const isBotTurn = (room: RoomState): boolean => {
+export const isAutoTurn = (room: RoomState): boolean => {
   const seat = seatOf(room, currentSeatId(room));
-  return room.status === 'playing' && !room.undoVote && seat?.kind === 'bot';
+  return room.status === 'playing' && !room.undoVote && !!seat && isAutoSeat(room, seat);
 };
 
 export const runBotTurn = (room: RoomState): Outcome | null => {
   const botId = currentSeatId(room);
-  if (!room.game || !botId || !isBotTurn(room)) return null;
+  if (!room.game || !botId || !isAutoTurn(room)) return null;
   const choice = chooseMove(viewFor(room.game, botId), legalMoves(room.game, botId), room.botRng);
   const outcome = applyGameMove({ ...room, botRng: choice.next }, botId, choice.move);
   return outcome.sync ? outcome : null;
@@ -435,9 +585,29 @@ export const expireUndo = (room: RoomState, ctx: Ctx): Outcome | null => {
   return synced(withChat({ ...room, undoVote: null }, [note]), { chat: [note] });
 };
 
+export const expireClock = (room: RoomState, ctx: Ctx): Outcome | null => {
+  const clock = room.clock;
+  if (!clock || clock.deadline > ctx.now || clock.seatId !== currentSeatId(room)) return null;
+  const note = systemChat(ctx, `${nameOf(room, clock.seatId)} is away. A bot plays for them`);
+  const away: RoomState = { ...room, clock: null, autopilot: [...room.autopilot, clock.seatId] };
+  return synced(withChat(away, [note]), { chat: [note] });
+};
+
+export const tick = (room: RoomState, ctx: Ctx): Outcome | null => {
+  const outcome = expireUndo(room, ctx) ?? expireClock(room, ctx) ?? runBotTurn(room);
+  return outcome && clocked(outcome, ctx.now);
+};
+
+export const disconnect = (room: RoomState, seatId: string, now: number): Outcome =>
+  synced(withClock(setConnected(room, seatId, false), now));
+
 export const nextWakeAt = (room: RoomState, now: number): number | null => {
-  if (room.undoVote) return room.undoVote.expiresAt;
-  return isBotTurn(room) ? now + BOT_DELAY_MS : null;
+  const wakes = [
+    room.undoVote?.expiresAt,
+    room.clock?.deadline,
+    isAutoTurn(room) ? now + BOT_DELAY_MS : undefined,
+  ].filter((t): t is number => t !== undefined);
+  return wakes.length > 0 ? Math.min(...wakes) : null;
 };
 
 export const snapshotOf = (room: RoomState): RoomSnapshot => ({
@@ -448,14 +618,19 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   seats: room.seats.map(({ id, name, kind, connected }) => ({ id, name, kind, connected })),
   undoAvailableTo: room.undoVote ? null : (room.undoPoint?.actorId ?? null),
   undoVote: room.undoVote,
+  turnDeadline: room.clock?.deadline ?? null,
+  turnExtended: room.clock?.extended ?? false,
+  autopilot: room.autopilot,
 });
 
 export const syncFor = (
   room: RoomState,
   viewerId: string | null,
   events: readonly GameEvent[],
+  now: number,
 ): ServerMessage => ({
   type: 'sync',
+  serverNow: now,
   room: snapshotOf(room),
   view: room.game ? viewFor(room.game, viewerId) : null,
   legal: room.game && viewerId && !room.undoVote ? legalMoves(room.game, viewerId) : [],

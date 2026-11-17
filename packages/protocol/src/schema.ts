@@ -49,6 +49,9 @@ export const clientMessageSchema: z.ZodType<ClientMessage> = z.discriminatedUnio
   z.object({ type: z.literal('undoRequest') }),
   z.object({ type: z.literal('undoVote'), approve: z.boolean() }),
   z.object({ type: z.literal('rematch') }),
+  z.object({ type: z.literal('stillHere') }),
+  z.object({ type: z.literal('resume') }),
+  z.object({ type: z.literal('leave') }),
 ]);
 
 export const parseClientMessage = (raw: string): ClientMessage | null => {

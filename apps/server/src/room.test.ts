@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import type { ClientMessage } from '@saffron/protocol';
 import {
+  DISCONNECT_GRACE_MS,
+  EXTEND_MS,
+  TURN_MS,
   UNDO_VOTE_MS,
   createRoom,
+  disconnect,
   expireUndo,
   handleMessage,
-  isBotTurn,
+  isAutoTurn,
   nextWakeAt,
   runBotTurn,
   setConnected,
   syncFor,
+  tick,
   upgradeRoom,
 } from './room.ts';
 import type { Ctx, Outcome, RoomState } from './room.ts';
@@ -87,7 +92,7 @@ describe('lobby', () => {
       code: 'notHost',
     });
     const themed = ok(send(b.room, a.seatId, { type: 'setTheme', theme: 'harbour' }));
-    const sync = syncFor(themed, a.seatId, []);
+    const sync = syncFor(themed, a.seatId, [], 0);
     expect(sync.type === 'sync' ? sync.room.theme : null).toBe('harbour');
   });
 
@@ -113,12 +118,14 @@ describe('lobby', () => {
     if (!room.game) throw new Error('no game');
     const legacyGame = omit(room.game, 'targetPoints');
     const upgraded = upgradeRoom({
-      ...omit(room, 'theme'),
+      ...omit(omit(omit(room, 'theme'), 'clock'), 'autopilot'),
       game: legacyGame,
       turnStart: legacyGame,
     });
     expect(upgraded.theme).toBe('paper');
     expect(upgraded.game?.targetPoints).toBe(15);
+    expect(upgraded.clock).toBeNull();
+    expect(upgraded.autopilot).toEqual([]);
   });
 
   it('turns late joiners into spectators once full or started', () => {
@@ -126,7 +133,7 @@ describe('lobby', () => {
     const late = send(room, null, { type: 'join', name: 'Citra' });
     expect(late.replies[0]).toEqual({ type: 'welcome', seatId: null, token: null });
     expect(late.room.seats).toHaveLength(2);
-    expect(syncFor(late.room, null, [])).toMatchObject({ type: 'sync', legal: [] });
+    expect(syncFor(late.room, null, [], 0)).toMatchObject({ type: 'sync', legal: [] });
   });
 
   it('rejects messages from sockets that have not joined', () => {
@@ -153,12 +160,13 @@ describe('play', () => {
     const a = joinAs(createRoom('ABCDE', 1), 'Ana');
     const withBot = ok(send(a.room, a.seatId, { type: 'addBot' }));
     const started = ok(send(withBot, a.seatId, { type: 'start' }));
-    expect(isBotTurn(started)).toBe(false);
-    expect(nextWakeAt(started, 0)).toBeNull();
+    expect(isAutoTurn(started)).toBe(false);
+    expect(nextWakeAt(started, 0)).toBe(started.clock?.deadline);
     const afterHuman = ok(
       send(started, a.seatId, { type: 'move', move: { type: 'takeDouble', spice: 'salt' } }),
     );
-    expect(isBotTurn(afterHuman)).toBe(true);
+    expect(isAutoTurn(afterHuman)).toBe(true);
+    expect(afterHuman.clock).toBeNull();
     expect(nextWakeAt(afterHuman, 0)).toBeGreaterThan(0);
     const afterBot = runBotTurn(afterHuman);
     expect(afterBot?.room.game?.currentPlayer).toBe(0);
@@ -218,5 +226,117 @@ describe('chat', () => {
       type: 'error',
       code: 'rateLimited',
     });
+  });
+});
+
+const salt = { type: 'move', move: { type: 'takeDouble', spice: 'salt' } } as const;
+
+describe('turn clock', () => {
+  it('starts a clock for each human turn', () => {
+    const { room, a, b } = twoHumans();
+    expect(room.clock).toMatchObject({ seatId: a, deadline: 1_000 + TURN_MS, extended: false });
+    const moved = ok(send(room, a, salt, 5_000));
+    expect(moved.clock).toMatchObject({ seatId: b, deadline: 5_000 + TURN_MS });
+    const chatted = send(moved, a, { type: 'chat', text: 'hi' }, 9_000).room;
+    expect(chatted.clock).toEqual(moved.clock);
+  });
+
+  it('hands a timed out seat to autopilot until they take back control', () => {
+    const { room, a, b } = twoHumans();
+    const deadline = room.clock?.deadline ?? 0;
+    expect(tick(room, ctx(deadline - 1))).toBeNull();
+    const away = tick(room, ctx(deadline));
+    expect(away?.room.autopilot).toEqual([a]);
+    expect(away?.room.clock).toBeNull();
+    if (!away) throw new Error('no timeout');
+    expect(isAutoTurn(away.room)).toBe(true);
+    const played = tick(away.room, ctx(deadline + 1_000));
+    expect(played?.room.game?.currentPlayer).toBe(1);
+    expect(played?.room.clock?.seatId).toBe(b);
+    if (!played) throw new Error('no bot move');
+    const back = ok(send(played.room, a, { type: 'resume' }, deadline + 2_000));
+    expect(back.autopilot).toEqual([]);
+  });
+
+  it('gives a fresh clock when taking back control on your own turn', () => {
+    const { room, a } = twoHumans();
+    const deadline = room.clock?.deadline ?? 0;
+    const away = tick(room, ctx(deadline))?.room;
+    if (!away) throw new Error('no timeout');
+    const back = ok(send(away, a, { type: 'resume' }, deadline + 100));
+    expect(back.clock).toMatchObject({ seatId: a, deadline: deadline + 100 + TURN_MS });
+  });
+
+  it('extends the clock once per turn', () => {
+    const { room, a, b } = twoHumans();
+    const deadline = room.clock?.deadline ?? 0;
+    expect(send(room, b, { type: 'stillHere' }).sync).toBe(false);
+    const extended = ok(send(room, a, { type: 'stillHere' }));
+    expect(extended.clock).toMatchObject({ deadline: deadline + EXTEND_MS, extended: true });
+    expect(send(extended, a, { type: 'stillHere' }).sync).toBe(false);
+  });
+
+  it('shortens the clock to a grace period when the player drops', () => {
+    const { room, a } = twoHumans();
+    const dropped = disconnect(room, a, 2_000).room;
+    expect(dropped.clock?.deadline).toBe(2_000 + DISCONNECT_GRACE_MS);
+    const later = send(dropped, a, { type: 'chat', text: 'x' }, 4_000).room;
+    expect(later.clock?.deadline).toBe(2_000 + DISCONNECT_GRACE_MS);
+  });
+
+  it('pauses during an undo vote and restarts after it', () => {
+    const { room, a } = twoHumans();
+    const moved = ok(send(room, a, salt));
+    const pending = ok(send(moved, a, { type: 'undoRequest' }, 3_000));
+    expect(pending.clock).toBeNull();
+    const expired = tick(pending, ctx(3_000 + UNDO_VOTE_MS))?.room;
+    expect(expired?.clock?.deadline).toBe(3_000 + UNDO_VOTE_MS + TURN_MS);
+  });
+
+  it('takes a manual move as being back', () => {
+    const { room, a } = twoHumans();
+    const away = tick(room, ctx(room.clock?.deadline ?? 0))?.room;
+    if (!away) throw new Error('no timeout');
+    expect(ok(send(away, a, salt)).autopilot).toEqual([]);
+  });
+});
+
+describe('kick and leave', () => {
+  it('kicks from the lobby by removing the seat', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const b = joinAs(a.room, 'Budi');
+    const outcome = send(b.room, a.seatId, { type: 'removeSeat', seatId: b.seatId });
+    expect(outcome.kick).toBe(b.seatId);
+    expect(outcome.room.seats).toHaveLength(1);
+  });
+
+  it('hands a kicked player to a bot mid-game and voids their token', () => {
+    const { room, a, b } = twoHumans();
+    expect(errorOf(send(room, b, { type: 'removeSeat', seatId: a }))).toEqual({
+      type: 'error',
+      code: 'notHost',
+    });
+    const outcome = send(room, a, { type: 'removeSeat', seatId: b });
+    expect(outcome.kick).toBe(b);
+    const seat = outcome.room.seats.find((s) => s.id === b);
+    expect(seat).toMatchObject({ kind: 'bot', token: null, name: 'Budi (bot)' });
+    expect(outcome.room.game?.players).toHaveLength(2);
+  });
+
+  it('lets a player leave mid-game and passes host on', () => {
+    const { room, a, b } = twoHumans();
+    const outcome = send(room, a, { type: 'leave' });
+    expect(outcome.bind).toBeNull();
+    expect(outcome.room.hostSeatId).toBe(b);
+    expect(outcome.room.clock).toBeNull();
+    expect(isAutoTurn(outcome.room)).toBe(true);
+  });
+
+  it('lets a player leave the lobby', () => {
+    const a = joinAs(createRoom('ABCDE', 1), 'Ana');
+    const b = joinAs(a.room, 'Budi');
+    const outcome = send(b.room, a.seatId, { type: 'leave' });
+    expect(outcome.room.seats.map((s) => s.id)).toEqual([b.seatId]);
+    expect(outcome.room.hostSeatId).toBe(b.seatId);
   });
 });
