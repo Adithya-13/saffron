@@ -10,6 +10,7 @@ import { useStore } from '../state/store.ts';
 import { ChatPanel } from '../components/ChatPanel.tsx';
 import { ConfirmAction } from '../components/ConfirmAction.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
+import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Avatar } from '../components/Avatar.tsx';
 import { CloseIcon } from '../art/Icons.tsx';
 import { shareUrl } from '../components/MenuSheet.tsx';
@@ -69,6 +70,7 @@ export const Lobby = () => {
   const seatId = useStore((s) => s.seatId);
   const showToast = useStore((s) => s.showToast);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   if (!room) return null;
 
   const isHost = seatId !== null && seatId === room.hostSeatId;
@@ -183,6 +185,9 @@ export const Lobby = () => {
           <button className="link-btn" type="button" onClick={() => setRulesOpen(true)}>
             How to play
           </button>
+          <button className="link-btn" type="button" onClick={() => setSoundOpen(true)}>
+            Sound
+          </button>
           {seatId !== null && (
             <button className="link-btn" type="button" onClick={leave}>
               Leave room
@@ -203,6 +208,7 @@ export const Lobby = () => {
         <ChatPanel />
       </aside>
       {rulesOpen && <RulesSheet onClose={() => setRulesOpen(false)} />}
+      {soundOpen && <SoundSettings onClose={() => setSoundOpen(false)} />}
     </main>
   );
 };

@@ -3,18 +3,18 @@ import { MAX_CHAT_LENGTH } from '@saffron/protocol';
 import { play } from '../audio/sound.ts';
 import { send } from '../net/socket.ts';
 import { useStore } from '../state/store.ts';
+import { useScrollToLatest } from './useScrollToLatest.ts';
 
 export const ChatPanel = ({ active = true }: { active?: boolean }) => {
   const chat = useStore((s) => s.chat);
   const seatId = useStore((s) => s.seatId);
   const markChatRead = useStore((s) => s.markChatRead);
   const [text, setText] = useState('');
-  const listRef = useRef<HTMLOListElement>(null);
   const lastId = chat.at(-1)?.id;
+  const listRef = useScrollToLatest<HTMLOListElement>(lastId);
   const lastSeat = chat.at(-1)?.seatId;
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
     if (active) markChatRead();
   }, [lastId, active, markChatRead]);
 

@@ -1,8 +1,9 @@
-import { bonusesOf, paymentFor, tokensFrom } from './counts.ts';
+import { bonusesOf, paymentFor, tokensFrom, totalTokens } from './counts.ts';
 import {
   DOUBLE_TAKE_MIN_PILE,
   MARKET_SLOTS,
   MAX_RESERVED,
+  MAX_TOKENS,
   SPICES,
   TIERS,
   TOKENS,
@@ -22,13 +23,19 @@ const playerAt = (state: GameState): PlayerState => {
   return player;
 };
 
+export const distinctTakeSizes = (state: GameState): readonly number[] => {
+  const available = SPICES.filter((s) => state.supply[s] > 0).length;
+  const full = Math.min(3, available);
+  if (full === 0) return [];
+  const room = MAX_TOKENS - totalTokens(playerAt(state).tokens);
+  return room >= 1 && room < full ? [room, full] : [full];
+};
+
 const takeMoves = (state: GameState): Move[] => {
   const available = SPICES.filter((s) => state.supply[s] > 0);
-  const size = Math.min(3, available.length);
-  const distinct: Move[] =
-    size === 0
-      ? []
-      : combinations(available, size).map((spices) => ({ type: 'takeDistinct', spices }));
+  const distinct: Move[] = distinctTakeSizes(state).flatMap((size) =>
+    combinations(available, size).map((spices): Move => ({ type: 'takeDistinct', spices })),
+  );
   const doubles: Move[] = SPICES.filter((s) => state.supply[s] >= DOUBLE_TAKE_MIN_PILE).map(
     (spice: Spice) => ({ type: 'takeDouble', spice }),
   );

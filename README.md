@@ -1,6 +1,6 @@
-# Saffron & Salt
+# Saffron
 
-An original spice-trading engine-builder for 2-4 players, playable online with friends in the browser. Collect spices, buy Stalls, Caravans and Fleets that give permanent discounts, win the favour of the guilds, and race to 15 prestige.
+An original spice-trading engine-builder for 2-8 players, playable online with friends in the browser. Collect spices, buy Stalls, Caravans and Fleets that give permanent discounts, win the favour of the guilds, and race to 15 prestige.
 
 ## Stack
 

@@ -1,6 +1,7 @@
 import { Howl, Howler } from 'howler';
 import { create } from 'zustand';
 import { loadSetting, saveSetting } from '../net/storage.ts';
+import { startCalmMusic } from './calmMusic.ts';
 
 export const SFX = [
   'clink1',
@@ -17,29 +18,42 @@ export const SFX = [
 ] as const;
 export type SfxName = (typeof SFX)[number];
 
-type LoopName = 'music' | 'ambience';
+export const MUSIC_TRACKS = ['teahouse', 'harbour', 'bazaar'] as const;
+export type MusicTrack = (typeof MUSIC_TRACKS)[number];
 
 type AudioSettings = {
-  readonly muted: boolean;
-  readonly sfxVolume: number;
-  readonly musicVolume: number;
-  readonly ambienceVolume: number;
+  readonly musicOn: boolean;
+  readonly track: MusicTrack;
+  readonly effectsOn: boolean;
+  readonly volume: number;
 };
 
-const readNumber = (key: string, fallback: number): number => {
-  const raw = loadSetting(key);
+const AMBIENCE_LEVEL = 0.5;
+
+const readVolume = (): number => {
+  const raw = loadSetting('volume');
   const value = raw === null ? NaN : Number(raw);
-  return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : fallback;
+  return Number.isFinite(value) ? Math.min(Math.max(value, 0), 1) : 0.6;
+};
+
+const readTrack = (): MusicTrack => {
+  const raw = loadSetting('track');
+  return MUSIC_TRACKS.find((t) => t === raw) ?? 'teahouse';
+};
+
+const readFlag = (key: string, fallback: boolean): boolean => {
+  const raw = loadSetting(key);
+  return raw === null ? fallback : raw === 'true';
 };
 
 const prefersQuiet = (): boolean =>
   typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
 
 export const useAudioSettings = create<AudioSettings>()(() => ({
-  muted: loadSetting('muted') === 'true',
-  sfxVolume: readNumber('sfxVolume', 0.5),
-  musicVolume: readNumber('musicVolume', prefersQuiet() ? 0 : 0.25),
-  ambienceVolume: readNumber('ambienceVolume', prefersQuiet() ? 0 : 0.18),
+  musicOn: readFlag('musicOn', !prefersQuiet()),
+  track: readTrack(),
+  effectsOn: readFlag('effectsOn', true),
+  volume: readVolume(),
 }));
 
 const sources = (name: string): string[] => [
@@ -48,8 +62,8 @@ const sources = (name: string): string[] => [
 ];
 
 const sfxCache = new Map<SfxName, Howl>();
-const loops = new Map<LoopName, Howl>();
 let unlocked = false;
+let playing: { readonly track: MusicTrack; readonly stop: () => void } | null = null;
 
 const sfx = (name: SfxName): Howl => {
   const cached = sfxCache.get(name);
@@ -59,54 +73,57 @@ const sfx = (name: SfxName): Howl => {
   return howl;
 };
 
-const loopVolume = (name: LoopName, s: AudioSettings): number =>
-  name === 'music' ? s.musicVolume : s.ambienceVolume;
-
-const syncLoop = (name: LoopName, s: AudioSettings): void => {
-  const volume = loopVolume(name, s);
-  const existing = loops.get(name);
-  if (volume === 0 || s.muted) {
-    existing?.pause();
-    return;
-  }
-  const howl = existing ?? new Howl({ src: sources(name), loop: true, html5: true, volume: 0 });
-  loops.set(name, howl);
-  if (!howl.playing()) {
-    howl.play();
-    howl.fade(0, volume, 1200);
-  } else {
-    howl.volume(volume);
-  }
+const startAmbience = (): (() => void) => {
+  const howl = new Howl({ src: sources('ambience'), loop: true, html5: true, volume: 0 });
+  howl.play();
+  howl.fade(0, AMBIENCE_LEVEL, 1200);
+  return () => {
+    howl.fade(howl.volume(), 0, 800);
+    setTimeout(() => howl.unload(), 900);
+  };
 };
 
-const syncLoops = (): void => {
+const startTrack = (track: MusicTrack): (() => void) | null => {
+  if (track === 'bazaar') return startAmbience();
+  const ctx = Howler.ctx;
+  if (!ctx) return null;
+  void ctx.resume();
+  return startCalmMusic(ctx, Howler.masterGain, track);
+};
+
+const syncMusic = (): void => {
   if (!unlocked) return;
   const s = useAudioSettings.getState();
-  syncLoop('music', s);
-  syncLoop('ambience', s);
+  const wanted = s.musicOn && s.volume > 0 ? s.track : null;
+  if (playing?.track === wanted) return;
+  playing?.stop();
+  playing = null;
+  if (wanted === null) return;
+  const stop = startTrack(wanted);
+  if (stop) playing = { track: wanted, stop };
 };
 
 export const unlockAudio = (): void => {
   if (unlocked) return;
   unlocked = true;
   SFX.forEach(sfx);
-  syncLoops();
+  syncMusic();
 };
 
 export const updateAudio = (patch: Partial<AudioSettings>): void => {
   useAudioSettings.setState(patch);
   for (const [key, value] of Object.entries(patch)) saveSetting(key, String(value));
-  Howler.mute(useAudioSettings.getState().muted);
-  syncLoops();
+  Howler.volume(useAudioSettings.getState().volume);
+  syncMusic();
 };
 
 export const play = (name: SfxName, options: { delay?: number; volume?: number } = {}): void => {
   const s = useAudioSettings.getState();
-  if (!unlocked || s.muted || s.sfxVolume === 0) return;
+  if (!unlocked || !s.effectsOn) return;
   const fire = () => {
     const howl = sfx(name);
     const id = howl.play();
-    howl.volume(s.sfxVolume * (options.volume ?? 1), id);
+    howl.volume(options.volume ?? 1, id);
     howl.rate(0.98 + Math.random() * 0.04, id);
   };
   if (options.delay) setTimeout(fire, options.delay);
@@ -121,4 +138,4 @@ export const playClinks = (count: number, startDelay = 0, gap = 70): void => {
   }
 };
 
-Howler.mute(useAudioSettings.getState().muted);
+Howler.volume(useAudioSettings.getState().volume);

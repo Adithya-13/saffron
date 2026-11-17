@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { SPICE_INFO } from '@saffron/content';
 import { TOKENS, bonusesOf, totalTokens } from '@saffron/engine';
 import type { Move, PlayerPublic } from '@saffron/engine';
@@ -125,10 +126,30 @@ const Action = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTurn: bo
   );
 };
 
+const useDockHeight = () => {
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const dock = ref.current;
+    if (!dock) return;
+    const root = document.documentElement;
+    const observer = new ResizeObserver(() => {
+      root.style.setProperty('--dock-h', `${dock.offsetHeight}px`);
+    });
+    observer.observe(dock);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--dock-h');
+    };
+  }, []);
+  return ref;
+};
+
 export const Dock = ({ me, myTurn }: { readonly me: PlayerPublic; readonly myTurn: boolean }) => {
   const held = totalTokens(me.tokens);
+  const ref = useDockHeight();
   return (
     <footer
+      ref={ref}
       className={`dock${myTurn ? ' dock--active' : ''}`}
       data-anchor={anchors.player(me.id)}
       aria-label="Your stall"

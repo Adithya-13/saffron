@@ -8,7 +8,7 @@ import {
   tokensFrom,
   totalTokens,
 } from './counts.ts';
-import { hasActionAvailable } from './legal.ts';
+import { distinctTakeSizes, hasActionAvailable } from './legal.ts';
 import { SPICES, TOKENS, DOUBLE_TAKE_MIN_PILE, MAX_RESERVED, MAX_TOKENS } from './types.ts';
 import type {
   BuySource,
@@ -143,13 +143,9 @@ const takeTokens = (state: GameState, taken: TokenCounts): Step => {
   };
 };
 
-const availableSpices = (state: GameState): readonly Spice[] =>
-  SPICES.filter((s) => state.supply[s] > 0);
-
 const takeDistinct = (state: GameState, spices: readonly Spice[]): MoveResult => {
   const unique = new Set(spices);
-  const required = Math.min(3, availableSpices(state).length);
-  if (unique.size !== spices.length || spices.length !== required || required === 0) {
+  if (unique.size !== spices.length || !distinctTakeSizes(state).includes(spices.length)) {
     return fail('invalidTokens');
   }
   if (spices.some((s) => !SPICES.includes(s) || state.supply[s] < 1)) return fail('supplyEmpty');

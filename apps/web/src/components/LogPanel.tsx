@@ -1,19 +1,16 @@
-import { useEffect, useRef } from 'react';
 import { describeEvent } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
+import { useScrollToLatest } from './useScrollToLatest.ts';
 
 export const LogPanel = () => {
   const log = useStore((s) => s.log);
   const room = useStore((s) => s.room);
-  const listRef = useRef<HTMLOListElement>(null);
   const lines = log.flatMap((event, i) => {
     const text = describeEvent(event, room);
     return text ? [{ key: i, text, kind: event.type }] : [];
   });
 
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
-  }, [lines.length]);
+  const listRef = useScrollToLatest<HTMLOListElement>(lines.length);
 
   return (
     <ol className="log" ref={listRef} aria-label="Move log">

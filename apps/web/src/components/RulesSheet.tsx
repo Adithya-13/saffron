@@ -14,7 +14,8 @@ export const RulesSheet = ({ onClose }: { onClose: () => void }) => {
         <h3>On your turn, do one thing</h3>
         <ul>
           <li>
-            <strong>Take 3 different spices</strong> from the market supply.
+            <strong>Take 3 different spices</strong> from the market supply. If that would put you
+            over 10, you can take just enough to reach 10.
           </li>
           <li>
             <strong>Take 2 of the same spice</strong>, only if that pile has 4 or more.

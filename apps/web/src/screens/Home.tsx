@@ -7,6 +7,7 @@ import { navigate } from '../App.tsx';
 import { SpiceIcon } from '../art/SpiceIcon.tsx';
 import { Card } from '../components/Card.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
+import { SoundSettings } from '../components/SoundSettings.tsx';
 import { createRoom } from '../net/socket.ts';
 import { loadName, saveName } from '../net/storage.ts';
 
@@ -20,7 +21,9 @@ const sampleCard = (tier: Tier, bonus: Spice): CardData | undefined =>
 const BUY_CARD = sampleCard(1, 'saffron');
 const SCORE_CARD = sampleCard(3, 'pepper');
 
-const HowToPlay = ({ onRules }: { readonly onRules: () => void }) => (
+type HowToPlayProps = { readonly onRules: () => void; readonly onSound: () => void };
+
+const HowToPlay = ({ onRules, onSound }: HowToPlayProps) => (
   <section className="home__how" aria-labelledby="home-how-title">
     <h2 id="home-how-title" className="home__section-title">
       How a turn works
@@ -50,9 +53,14 @@ const HowToPlay = ({ onRules }: { readonly onRules: () => void }) => (
         <p className="home__step-text">Reach the target first, and the guilds come calling.</p>
       </li>
     </ol>
-    <button className="link-btn" type="button" onClick={onRules}>
-      Read the full rules
-    </button>
+    <span className="home__links">
+      <button className="link-btn" type="button" onClick={onRules}>
+        Read the full rules
+      </button>
+      <button className="link-btn" type="button" onClick={onSound}>
+        Sound
+      </button>
+    </span>
   </section>
 );
 
@@ -62,6 +70,7 @@ export const Home = () => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [soundOpen, setSoundOpen] = useState(false);
   const trimmed = name.trim();
   const codeReady = joinCode.trim().length === ROOM_CODE_LENGTH;
 
@@ -165,10 +174,11 @@ export const Home = () => {
           {error && <p className="home__error">{error}</p>}
         </section>
 
-        <HowToPlay onRules={() => setRulesOpen(true)} />
+        <HowToPlay onRules={() => setRulesOpen(true)} onSound={() => setSoundOpen(true)} />
       </div>
 
       {rulesOpen && <RulesSheet onClose={() => setRulesOpen(false)} />}
+      {soundOpen && <SoundSettings onClose={() => setSoundOpen(false)} />}
     </main>
   );
 };

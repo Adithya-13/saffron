@@ -119,6 +119,31 @@ describe('taking tokens', () => {
     expect(applyMove(state, 'a', { type: 'takeDistinct', spices: ['saffron'] }).ok).toBe(true);
   });
 
+  it('allows taking just enough to reach 10 tokens', () => {
+    const base = start();
+    const nearFull = (held: number): GameState =>
+      patchPlayer(base, 0, { tokens: tokensFrom({ pepper: held }) });
+    expect(applyMove(nearFull(9), 'a', { type: 'takeDistinct', spices: ['saffron'] }).ok).toBe(
+      true,
+    );
+    expect(
+      applyMove(nearFull(8), 'a', { type: 'takeDistinct', spices: ['saffron', 'sumac'] }).ok,
+    ).toBe(true);
+    expect(applyMove(nearFull(8), 'a', { type: 'takeDistinct', spices: ['saffron'] })).toEqual({
+      ok: false,
+      error: 'invalidTokens',
+    });
+    expect(
+      applyMove(nearFull(9), 'a', {
+        type: 'takeDistinct',
+        spices: ['saffron', 'cardamom', 'sumac'],
+      }).ok,
+    ).toBe(true);
+    expect(applyMove(nearFull(10), 'a', { type: 'takeDistinct', spices: ['saffron'] }).ok).toBe(
+      false,
+    );
+  });
+
   it('takes a double only from a pile of 4 or more', () => {
     const state = start();
     expect(

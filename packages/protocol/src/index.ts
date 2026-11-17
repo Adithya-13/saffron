@@ -9,7 +9,7 @@ export type Theme = (typeof THEMES)[number];
 export const DEFAULT_THEME: Theme = 'paper';
 
 export const TURN_MS = 60_000;
-export const TURN_WARN_MS = 5_000;
+export const TURN_WARN_MS = 15_000;
 
 export type ClientMessage =
   | { readonly type: 'join'; readonly name: string; readonly token?: string | undefined }

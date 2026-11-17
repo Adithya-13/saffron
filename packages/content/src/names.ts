@@ -1,6 +1,6 @@
 import type { Tier, Token } from '@saffron/engine';
 
-export const GAME_NAME = 'Saffron & Salt';
+export const GAME_NAME = 'Saffron';
 
 export const SPICE_INFO: Readonly<
   Record<Token, { readonly label: string; readonly color: string }>
