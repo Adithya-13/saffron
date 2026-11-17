@@ -1,6 +1,12 @@
 import { applyMove, createGame, legalMoves, seedRng, viewFor } from '@saffron/engine';
-import type { Catalog, GameEvent, GameState } from '@saffron/engine';
+import type { Catalog, GameEvent, GameState, Move, PlayerView, RngState } from '@saffron/engine';
 import { chooseMove } from './chooseMove.ts';
+
+export type Strategy = (
+  view: PlayerView,
+  moves: readonly Move[],
+  rng: RngState,
+) => { readonly move: Move; readonly next: RngState };
 
 export const MAX_SIM_STEPS = 2000;
 
@@ -12,7 +18,12 @@ export type SimResult = {
   readonly rounds: number;
 };
 
-export const simulateGame = (catalog: Catalog, playerCount: number, seed: number): SimResult => {
+export const simulateGame = (
+  catalog: Catalog,
+  playerCount: number,
+  seed: number,
+  strategies: readonly Strategy[] = [],
+): SimResult => {
   const ids = Array.from({ length: playerCount }, (_, i) => `p${i + 1}`);
   let state = createGame(catalog, ids, seed);
   let rng = seedRng(seed ^ 0x9e3779b9);
@@ -22,7 +33,8 @@ export const simulateGame = (catalog: Catalog, playerCount: number, seed: number
   for (let step = 0; step < MAX_SIM_STEPS && !state.finished; step++) {
     const player = state.players[state.currentPlayer];
     if (!player) throw new Error('No current player');
-    const choice = chooseMove(viewFor(state, player.id), legalMoves(state, player.id), rng);
+    const strategy = strategies[state.currentPlayer] ?? chooseMove;
+    const choice = strategy(viewFor(state, player.id), legalMoves(state, player.id), rng);
     rng = choice.next;
     const result = applyMove(state, player.id, choice.move);
     if (!result.ok) throw new Error(`Bot made illegal move: ${result.error}`);

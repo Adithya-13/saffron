@@ -8,7 +8,8 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "sim": "node src/report.ts"
+    "sim": "node src/report.ts",
+    "versus": "node src/versus.ts"
   },
   "dependencies": {
     "@saffron/engine": "workspace:*"
