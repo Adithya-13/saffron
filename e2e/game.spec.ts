@@ -83,7 +83,7 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await waitForMyTurn(ana);
   await expect(ana.locator('.market__row--reserve')).toHaveCount(0);
 
-  await ana.getByRole('button', { name: /^Chat/ }).click();
+  await expect(ana.getByRole('tab', { name: 'Chat', selected: true })).toBeVisible();
   await ana.getByLabel('Chat message').fill('Good luck, Budi!');
   await ana.getByRole('button', { name: 'Send' }).click();
   await expect(budi.locator('.chat-bubble', { hasText: 'Good luck, Budi!' })).toBeVisible();
@@ -94,7 +94,7 @@ test('two friends play, undo, chat and reconnect', async ({ browser }) => {
   await expect(budi.locator('.chat__text', { hasText: 'Good luck, Budi!' })).toBeVisible();
   await shot(budi, '05b-chat-sheet');
   await budi.getByRole('button', { name: 'Close' }).click();
-  await ana.getByRole('button', { name: 'Close' }).click();
+  await shot(ana, '05c-desk-rail');
 
   await budi.reload();
   await expect(budi.locator('.topbar__turn')).toHaveText("Ana's turn", { timeout: 15_000 });

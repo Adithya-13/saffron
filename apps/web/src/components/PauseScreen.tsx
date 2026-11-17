@@ -3,7 +3,7 @@ import { send } from '../net/socket.ts';
 import { nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 
-type Props = { readonly onChat: () => void; readonly onMenu: () => void };
+type Props = { readonly onChat?: (() => void) | undefined; readonly onMenu: () => void };
 
 export const PauseScreen = ({ onChat, onMenu }: Props) => {
   const room = useStore((s) => s.room);
@@ -27,9 +27,11 @@ export const PauseScreen = ({ onChat, onMenu }: Props) => {
           and chat stays open.
         </p>
         <div className="pause__actions">
-          <button className="btn btn--ghost" type="button" onClick={onChat}>
-            Chat
-          </button>
+          {onChat && (
+            <button className="btn btn--ghost" type="button" onClick={onChat}>
+              Chat
+            </button>
+          )}
           <button className="btn btn--ghost" type="button" onClick={onMenu}>
             Menu
           </button>

@@ -21,10 +21,13 @@ import { PhaseSheets } from '../components/PhaseSheets.tsx';
 import { PlayersTable } from '../components/PlayersTable.tsx';
 import { RulesSheet } from '../components/RulesSheet.tsx';
 import { Sheet } from '../components/Sheet.tsx';
+import { SideRail } from '../components/SideRail.tsx';
+import type { RailTab } from '../components/SideRail.tsx';
 import { SoundSettings } from '../components/SoundSettings.tsx';
 import { Supply } from '../components/Supply.tsx';
 import { UndoBar } from '../components/UndoBar.tsx';
 import { Watchers } from '../components/Watchers.tsx';
+import { useWideScreen } from '../components/useWideScreen.ts';
 import { useCue } from '../audio/useCue.ts';
 import { useTurnRemaining } from '../state/clock.ts';
 import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
@@ -58,6 +61,8 @@ export const Table = () => {
   const seatId = useStore((s) => s.seatId);
   const unread = useStore((s) => s.unreadChat);
   const [panel, setPanel] = useState<Panel>(null);
+  const wide = useWideScreen();
+  const [railTab, setRailTab] = useState<RailTab>('chat');
   const flightsActive = useAnim((s) => s.flights.length > 0);
   const finished = view?.finished ?? false;
   const [showEnd, setShowEnd] = useState(false);
@@ -108,9 +113,11 @@ export const Table = () => {
   const current = currentOf(view);
   const lowTime = remaining !== null && remaining <= LOW_TIME_MS;
   const close = () => setPanel(null);
+  const chatVisible = wide ? railTab === 'chat' : panel?.kind === 'chat';
+  const openChat = () => (wide ? setRailTab('chat') : setPanel({ kind: 'chat' }));
 
   return (
-    <div className="table">
+    <div className={`table${wide ? ' table--desk' : ''}`}>
       <header className="topbar">
         <span className="topbar__status">
           {current && !view.finished && !intro && (
@@ -140,23 +147,27 @@ export const Table = () => {
         >
           <CompareIcon />
         </button>
-        <button
-          className="icon-btn"
-          type="button"
-          onClick={() => setPanel({ kind: 'log' })}
-          aria-label="Move log"
-        >
-          <LogIcon />
-        </button>
-        <button
-          className="icon-btn"
-          type="button"
-          onClick={() => setPanel({ kind: 'chat' })}
-          aria-label={unread > 0 ? `Chat, ${unread} unread` : 'Chat'}
-        >
-          <ChatIcon />
-          {unread > 0 && <span className="icon-btn__dot" />}
-        </button>
+        {!wide && (
+          <>
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={() => setPanel({ kind: 'log' })}
+              aria-label="Move log"
+            >
+              <LogIcon />
+            </button>
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={openChat}
+              aria-label={unread > 0 ? `Chat, ${unread} unread` : 'Chat'}
+            >
+              <ChatIcon />
+              {unread > 0 && <span className="icon-btn__dot" />}
+            </button>
+          </>
+        )}
         <button
           className="icon-btn"
           type="button"
@@ -167,17 +178,35 @@ export const Table = () => {
         </button>
       </header>
 
-      <ChatBubble suppressed={panel?.kind === 'chat'} onOpen={() => setPanel({ kind: 'chat' })} />
+      <ChatBubble suppressed={chatVisible} onOpen={openChat} />
       <UndoBar />
 
-      <main className="board">
-        <Players onOpen={(id) => setPanel({ kind: 'player', id })} />
-        <GuildStrip onOpen={(id) => setPanel({ kind: 'guild', id })} />
-        <Market me={me} />
-        <Supply interactive={interactive} />
-      </main>
-
-      {me && <Dock me={me} myTurn={myTurn} />}
+      {wide ? (
+        <div className="desk">
+          <div className="desk__side">
+            <Players onOpen={(id) => setPanel({ kind: 'player', id })} />
+            <GuildStrip onOpen={(id) => setPanel({ kind: 'guild', id })} />
+          </div>
+          <main className="desk__main">
+            <div className="desk__market">
+              <Market me={me} />
+            </div>
+            <Supply interactive={interactive} />
+            {me && <Dock me={me} myTurn={myTurn} />}
+          </main>
+          <SideRail tab={railTab} onTab={setRailTab} />
+        </div>
+      ) : (
+        <>
+          <main className="board">
+            <Players onOpen={(id) => setPanel({ kind: 'player', id })} />
+            <GuildStrip onOpen={(id) => setPanel({ kind: 'guild', id })} />
+            <Market me={me} />
+            <Supply interactive={interactive} />
+          </main>
+          {me && <Dock me={me} myTurn={myTurn} />}
+        </>
+      )}
 
       <CardDetail me={me} interactive={interactive} />
       <PhaseSheets me={me} myTurn={myTurn} />
@@ -207,7 +236,7 @@ export const Table = () => {
       {panel?.kind === 'guild' && <GuildDetail guildId={panel.id} onClose={close} />}
       {room.pausedAt !== null && !view.finished && (
         <PauseScreen
-          onChat={() => setPanel({ kind: 'chat' })}
+          onChat={wide ? undefined : openChat}
           onMenu={() => setPanel({ kind: 'menu' })}
         />
       )}
