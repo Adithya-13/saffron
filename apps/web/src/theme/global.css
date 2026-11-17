@@ -2863,7 +2863,8 @@ button.card {
   gap: 10px;
 }
 
-.end__actions .muted {
+.end__actions .muted,
+.end__actions .btn--primary {
   grid-column: 1 / -1;
   margin: 0;
 }
@@ -2981,7 +2982,8 @@ button.card {
   box-shadow: none;
 }
 
-.table--desk .pause {
+.table--desk .pause,
+.table--desk .end {
   right: var(--rail-w);
 }
 

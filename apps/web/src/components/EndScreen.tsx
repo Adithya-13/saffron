@@ -7,10 +7,13 @@ import { nameOf, seatIndex } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 import { Avatar } from './Avatar.tsx';
 
-export const EndScreen = () => {
+type Props = { readonly onChat?: (() => void) | undefined };
+
+export const EndScreen = ({ onChat }: Props) => {
   const view = useStore((s) => s.view);
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
+  const unread = useStore((s) => s.unreadChat);
 
   useEffect(() => {
     play('victory', { delay: 300, volume: 0.45 });
@@ -71,6 +74,11 @@ export const EndScreen = () => {
             </button>
           ) : (
             <p className="muted">Waiting for the host to start a rematch...</p>
+          )}
+          {onChat && (
+            <button className="btn btn--ghost" type="button" onClick={onChat}>
+              {unread > 0 ? `Chat (${unread})` : 'Chat'}
+            </button>
           )}
           <button className="btn btn--ghost" type="button" onClick={() => navigate('/')}>
             Leave

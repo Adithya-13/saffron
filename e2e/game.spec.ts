@@ -177,6 +177,10 @@ test('a full game against a bot reaches the end screen', async ({ browser }) => 
   await expect(page.locator('.end__rank')).toHaveCount(2);
   await page.waitForTimeout(2500);
   await shot(page, '09-end-screen');
+  await end.getByRole('button', { name: /^Chat/ }).click();
+  await page.getByLabel('Chat message').fill('good game');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(page.locator('.chat__text', { hasText: 'good game' })).toBeVisible();
 });
 
 test('solo game against a bot advances automatically', async ({ browser }) => {

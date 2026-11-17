@@ -240,7 +240,7 @@ export const Table = () => {
           onMenu={() => setPanel({ kind: 'menu' })}
         />
       )}
-      {showEnd && <EndScreen />}
+      {showEnd && <EndScreen onChat={wide ? undefined : openChat} />}
       {intro && <FirstTurn onDone={() => setIntro(false)} />}
     </div>
   );
