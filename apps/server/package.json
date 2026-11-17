@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --port 8787",
     "deploy": "wrangler deploy",
+    "deploy:redirect": "wrangler deploy -c wrangler.redirect.jsonc",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {

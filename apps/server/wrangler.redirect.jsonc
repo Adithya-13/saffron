@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "saffron-and-salt",
+  "main": "src/redirect.ts",
+  "compatibility_date": "2026-11-01",
+  "vars": { "TARGET_ORIGIN": "https://saffron.aditputrafirmansyah.workers.dev" },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Room"] },
+    { "tag": "v2", "deleted_classes": ["Room"] },
+  ],
+}
