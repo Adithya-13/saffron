@@ -27,10 +27,10 @@ const RULES_BY_PLAYERS: Readonly<Record<number, TableRules>> = {
   2: { spicePerPile: 4, seals: 5, targetPoints: 15, guilds: 3, deckCopies: 1 },
   3: { spicePerPile: 5, seals: 5, targetPoints: 15, guilds: 4, deckCopies: 1 },
   4: { spicePerPile: 7, seals: 5, targetPoints: 15, guilds: 5, deckCopies: 1 },
-  5: { spicePerPile: 8, seals: 6, targetPoints: 13, guilds: 6, deckCopies: 2 },
-  6: { spicePerPile: 9, seals: 7, targetPoints: 13, guilds: 7, deckCopies: 2 },
-  7: { spicePerPile: 10, seals: 7, targetPoints: 12, guilds: 7, deckCopies: 2 },
-  8: { spicePerPile: 11, seals: 8, targetPoints: 12, guilds: 8, deckCopies: 2 },
+  5: { spicePerPile: 8, seals: 6, targetPoints: 15, guilds: 6, deckCopies: 2 },
+  6: { spicePerPile: 9, seals: 7, targetPoints: 15, guilds: 7, deckCopies: 2 },
+  7: { spicePerPile: 10, seals: 7, targetPoints: 15, guilds: 7, deckCopies: 2 },
+  8: { spicePerPile: 11, seals: 8, targetPoints: 15, guilds: 8, deckCopies: 2 },
 };
 
 export const rulesFor = (playerCount: number): TableRules => {

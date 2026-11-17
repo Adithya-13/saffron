@@ -43,9 +43,7 @@ export const EndScreen = () => {
             ? 'You win the bazaar'
             : `${winners.map((w) => nameOf(room, w.id)).join(' & ')} ${winners.length > 1 ? 'share the win' : 'wins'}`}
         </h2>
-        <p className="end__goal">
-          Goal with {view.players.length} merchants: {view.targetPoints} prestige
-        </p>
+        <p className="end__goal">Goal: {view.targetPoints} prestige</p>
         <ol className="end__ranks">
           {ranked.map((p, i) => (
             <li

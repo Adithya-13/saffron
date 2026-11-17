@@ -168,8 +168,8 @@ export const GoalSection = ({ onRules }: { readonly onRules: () => void }) => (
         First to 15 prestige
       </h2>
       <p className="landing__lead">
-        With 5 or 6 merchants the goal is 13, with 7 or 8 it is 12. The round always finishes, so
-        everyone gets the same number of turns.
+        Whatever the table size, the goal is 15. The round always finishes, so everyone gets the
+        same number of turns.
       </p>
       <span className="goal__links">
         <button className="link-btn" type="button" onClick={onRules}>

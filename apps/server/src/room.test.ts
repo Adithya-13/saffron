@@ -128,7 +128,7 @@ describe('lobby', () => {
     });
     const started = ok(send(full, a.seatId, { type: 'start' }));
     expect(started.game?.players).toHaveLength(8);
-    expect(started.game?.targetPoints).toBe(12);
+    expect(started.game?.targetPoints).toBe(15);
   });
 
   it('upgrades rooms stored before themes and per-table targets', () => {

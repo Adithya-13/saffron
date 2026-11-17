@@ -1,15 +1,12 @@
-import { useStore } from '../state/store.ts';
 import { Sheet } from './Sheet.tsx';
 
 export const RulesSheet = ({ onClose }: { onClose: () => void }) => {
-  const target = useStore((s) => s.view?.targetPoints);
   return (
     <Sheet title="How to trade" onClose={onClose}>
       <div className="rules">
         <p>
-          Be the first merchant to reach <strong>{target ?? 15} prestige</strong>
-          {target === undefined && ' (13 with 5-6 merchants, 12 with 7-8)'}. When someone does, the
-          round finishes so everyone gets the same number of turns.
+          Be the first merchant to reach <strong>15 prestige</strong>. When someone does, the round
+          finishes so everyone gets the same number of turns.
         </p>
         <h3>On your turn, do one thing</h3>
         <ul>

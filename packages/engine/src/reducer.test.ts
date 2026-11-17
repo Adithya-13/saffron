@@ -77,10 +77,11 @@ describe('setup', () => {
     );
     expect(state.supply.saffron).toBe(11);
     expect(state.supply.seal).toBe(8);
-    expect(state.targetPoints).toBe(12);
+    expect(state.targetPoints).toBe(15);
   });
 
-  it('keeps classic targets up to four players', () => {
+  it('plays to 15 prestige at every table size', () => {
+    expect(start(2).targetPoints).toBe(15);
     expect(start(4).targetPoints).toBe(15);
   });
 
