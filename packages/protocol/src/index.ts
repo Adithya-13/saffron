@@ -69,6 +69,12 @@ export type ChatMessage = {
   readonly watching?: boolean;
 };
 
+export type GameTime = {
+  readonly startedAt: number;
+  readonly pausedMs: number;
+  readonly endedAt: number | null;
+};
+
 export type RoomSnapshot = {
   readonly code: string;
   readonly status: RoomStatus;
@@ -82,6 +88,7 @@ export type RoomSnapshot = {
   readonly turnExtended: boolean;
   readonly autopilot: readonly string[];
   readonly pausedAt: number | null;
+  readonly gameTime: GameTime | null;
 };
 
 export type ErrorCode =

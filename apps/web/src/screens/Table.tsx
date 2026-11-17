@@ -29,7 +29,7 @@ import { UndoBar } from '../components/UndoBar.tsx';
 import { Watchers } from '../components/Watchers.tsx';
 import { useWideScreen } from '../components/useWideScreen.ts';
 import { useCue } from '../audio/useCue.ts';
-import { useTurnRemaining } from '../state/clock.ts';
+import { formatElapsed, useGameElapsed, useTurnRemaining } from '../state/clock.ts';
 import { currentOf, isMyTurn, meOf, nameOf } from '../state/selectors.ts';
 import { useStore } from '../state/store.ts';
 
@@ -69,6 +69,7 @@ export const Table = () => {
   const [intro, setIntro] = useState(isFreshGame);
   const guildIds = view?.guilds.map((g) => g.id).join(',') ?? '';
   const remaining = useTurnRemaining();
+  const elapsed = useGameElapsed();
   const myTurn = isMyTurn(view, seatId);
   const paused = room?.pausedAt != null;
   const lowSecond =
@@ -138,6 +139,11 @@ export const Table = () => {
             style={{ transform: `scaleX(${remaining / Math.max(TURN_MS, remaining)})` }}
             aria-hidden
           />
+        )}
+        {elapsed !== null && (
+          <span className="topbar__elapsed" aria-label={`Game time ${formatElapsed(elapsed)}`}>
+            {formatElapsed(elapsed)}
+          </span>
         )}
         <button
           className="icon-btn"

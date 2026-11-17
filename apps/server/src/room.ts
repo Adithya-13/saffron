@@ -17,6 +17,7 @@ import type {
   ChatMessage,
   ClientMessage,
   ErrorCode,
+  GameTime,
   RoomSnapshot,
   RoomStatus,
   SeatInfo,
@@ -80,6 +81,7 @@ export type RoomState = {
   readonly autopilot: readonly string[];
   readonly introUntil: number;
   readonly pausedAt: number | null;
+  readonly gameTime: GameTime | null;
 };
 
 export type Ctx = { readonly now: number; readonly randomId: () => string; readonly seed: number };
@@ -133,6 +135,7 @@ export const createRoom = (code: string, seed: number): RoomState => ({
   autopilot: [],
   introUntil: 0,
   pausedAt: null,
+  gameTime: null,
 });
 
 const LEGACY_TARGET_POINTS = 15;
@@ -150,7 +153,9 @@ export type StoredRoom = Omit<
   | 'autopilot'
   | 'introUntil'
   | 'pausedAt'
+  | 'gameTime'
 > & {
+  readonly gameTime?: GameTime | null;
   readonly introUntil?: number;
   readonly pausedAt?: number | null;
   readonly theme?: Theme;
@@ -177,6 +182,7 @@ export const upgradeRoom = (stored: StoredRoom): RoomState => ({
   autopilot: stored.autopilot ?? [],
   introUntil: stored.introUntil ?? 0,
   pausedAt: stored.pausedAt ?? null,
+  gameTime: stored.gameTime ?? null,
   game: stored.game && upgradeGame(stored.game),
   turnStart: stored.turnStart && upgradeGame(stored.turnStart),
   undoPoint: stored.undoPoint && {
@@ -462,6 +468,7 @@ const start = (room: RoomState, senderId: string | null, ctx: Ctx): Outcome => {
         status: 'playing',
         introUntil: ctx.now + START_INTRO_MS,
         pausedAt: null,
+        gameTime: { startedAt: ctx.now + START_INTRO_MS, pausedMs: 0, endedAt: null },
         game,
         turnStart: game,
         undoPoint: null,
@@ -485,6 +492,7 @@ const rematch = (room: RoomState, senderId: string | null): Outcome => {
     undoPoint: null,
     undoVote: null,
     log: [],
+    gameTime: null,
   });
 };
 
@@ -503,6 +511,7 @@ const setPaused = (room: RoomState, senderId: string, paused: boolean, ctx: Ctx)
   const resumed: RoomState = {
     ...room,
     pausedAt: null,
+    gameTime: room.gameTime && { ...room.gameTime, pausedMs: room.gameTime.pausedMs + held },
     introUntil: room.introUntil > (pausedAt ?? 0) ? room.introUntil + held : room.introUntil,
     clock: room.clock && { ...room.clock, deadline: room.clock.deadline + held },
     undoVote: room.undoVote && { ...room.undoVote, expiresAt: room.undoVote.expiresAt + held },
@@ -666,9 +675,14 @@ export const withClock = (room: RoomState, now: number): RoomState => {
   return { ...room, clock: { ...kept, deadline } };
 };
 
+const withEndTime = (room: RoomState, now: number): RoomState =>
+  room.status === 'finished' && room.gameTime && room.gameTime.endedAt === null
+    ? { ...room, gameTime: { ...room.gameTime, endedAt: Math.max(now, room.gameTime.startedAt) } }
+    : room;
+
 const clocked = (outcome: Outcome, now: number): Outcome => ({
   ...outcome,
-  room: withClock(outcome.room, now),
+  room: withClock(withEndTime(outcome.room, now), now),
 });
 
 const stillHere = (room: RoomState, senderId: string): Outcome => {
@@ -805,6 +819,7 @@ export const snapshotOf = (room: RoomState): RoomSnapshot => ({
   turnDeadline: room.clock?.deadline ?? null,
   turnExtended: room.clock?.extended ?? false,
   pausedAt: room.pausedAt,
+  gameTime: room.gameTime,
   autopilot: room.autopilot,
 });
 

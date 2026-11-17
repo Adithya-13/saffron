@@ -259,6 +259,24 @@ describe('pause', () => {
     expect(errorOf(send(resumed, a, salt, 71_000))).toBeUndefined();
   });
 
+  it('keeps game time: starts after the intro, skips pauses, stops at the end', () => {
+    const { room, a } = twoHumans();
+    expect(room.gameTime).toEqual({
+      startedAt: 1_000 + START_INTRO_MS,
+      pausedMs: 0,
+      endedAt: null,
+    });
+    const paused = ok(send(room, a, { type: 'setPaused', paused: true }, 10_000));
+    const resumed = ok(send(paused, a, { type: 'setPaused', paused: false }, 70_000));
+    expect(resumed.gameTime?.pausedMs).toBe(60_000);
+    const over: RoomState = { ...resumed, status: 'finished' };
+    const ended = ok(send(over, a, { type: 'chat', text: 'gg' }, 90_000));
+    expect(ended.gameTime?.endedAt).toBe(90_000);
+    const later = ok(send(ended, a, { type: 'chat', text: 'again?' }, 120_000));
+    expect(later.gameTime?.endedAt).toBe(90_000);
+    expect(ok(send(later, a, { type: 'rematch' }, 121_000)).gameTime).toBeNull();
+  });
+
   it('only pauses a game in progress', () => {
     const a = joinAs(createRoom('ABCDE', 1), 'Ana');
     expect(errorOf(send(a.room, a.seatId, { type: 'setPaused', paused: true }))).toEqual({

@@ -1337,6 +1337,15 @@ a.link-btn {
   color: var(--danger);
 }
 
+.topbar__elapsed {
+  padding: 0 6px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .topbar__timer {
   position: absolute;
   left: 0;

@@ -4,6 +4,7 @@ import { play } from '../audio/sound.ts';
 import { navigate } from '../App.tsx';
 import { send } from '../net/socket.ts';
 import { nameOf, seatIndex } from '../state/selectors.ts';
+import { describeElapsed, useGameElapsed } from '../state/clock.ts';
 import { useStore } from '../state/store.ts';
 import { Avatar } from './Avatar.tsx';
 
@@ -14,6 +15,7 @@ export const EndScreen = ({ onChat }: Props) => {
   const room = useStore((s) => s.room);
   const seatId = useStore((s) => s.seatId);
   const unread = useStore((s) => s.unreadChat);
+  const elapsed = useGameElapsed();
 
   useEffect(() => {
     play('victory', { delay: 300, volume: 0.45 });
@@ -46,7 +48,10 @@ export const EndScreen = ({ onChat }: Props) => {
             ? 'You win the bazaar'
             : `${winners.map((w) => nameOf(room, w.id)).join(' & ')} ${winners.length > 1 ? 'share the win' : 'wins'}`}
         </h2>
-        <p className="end__goal">Goal: {view.targetPoints} prestige</p>
+        <p className="end__goal">
+          Goal: {view.targetPoints} prestige
+          {elapsed !== null && ` · Played ${describeElapsed(elapsed)}`}
+        </p>
         <ol className="end__ranks">
           {ranked.map((p, i) => (
             <li
